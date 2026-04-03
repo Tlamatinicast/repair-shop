@@ -37,6 +37,7 @@ model Repair {
   password     String?
   parts        RepairPart[]
   photos       RepairPhoto[]
+  repairNotes  RepairNote[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   deliveredAt  DateTime?
@@ -76,6 +77,18 @@ model RepairPhoto {
   stage     String   @default("RECEIVED")
   caption   String?
   createdAt DateTime @default(now())
+}
+
+model RepairNote {
+  id         Int      @id @default(autoincrement())
+  repair     Repair   @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  repairId   Int
+  content    String
+  stage      String   @default("IN_REPAIR")
+  photoUrl   String?
+  authorName String
+  authorRole String
+  createdAt  DateTime @default(now())
 }
 
 model User {

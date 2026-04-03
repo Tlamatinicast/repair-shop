@@ -8,18 +8,24 @@ import { ArrowLeft, User, Smartphone, Package, Clock, Edit } from 'lucide-react'
 import { UpdateStatusForm } from './UpdateStatusForm';
 import { TicketButtons } from './TicketButtons';
 import { PhotoGallery } from './PhotoGallery';
+import { RepairTimeline } from './RepairTimeline';
+import { getSession } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export default async function RepairDetailPage({ params }: { params: { id: string } }) {
-  const repair = await prisma.repair.findUnique({
-    where: { id: Number(params.id) },
-    include: {
-      customer: true,
-      parts: { include: { item: true } },
-      photos: { orderBy: { createdAt: 'asc' } },
-    },
-  });
+  const [repair, session] = await Promise.all([
+    prisma.repair.findUnique({
+      where: { id: Number(params.id) },
+      include: {
+        customer: true,
+        parts: { include: { item: true } },
+        photos: { orderBy: { createdAt: 'asc' } },
+        repairNotes: { orderBy: { createdAt: 'desc' } },
+      },
+    }),
+    getSession(),
+  ]);
 
   if (!repair) notFound();
 
@@ -119,6 +125,21 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                 initialPhotos={repair.photos.map(p => ({
                   ...p,
                   createdAt: p.createdAt.toISOString(),
+                }))}
+              />
+            </div>
+          </div>
+
+          {/* Activity timeline */}
+          <div className="card p-5">
+            <SectionHeader icon={<Clock size={14} />} title="Historial de actividad" />
+            <div className="mt-4">
+              <RepairTimeline
+                repairId={repair.id}
+                userRole={(session?.user as any)?.role ?? 'TECHNICIAN'}
+                initialNotes={repair.repairNotes.map(n => ({
+                  ...n,
+                  createdAt: n.createdAt.toISOString(),
                 }))}
               />
             </div>
