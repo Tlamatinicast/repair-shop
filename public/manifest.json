@@ -1,0 +1,39 @@
+{
+  "name": "TLAMATECH — Sistema de Gestión",
+  "short_name": "TLAMATECH",
+  "description": "Sistema de gestión para taller de reparación TLAMATECH",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080808",
+  "theme_color": "#080808",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Nueva reparación",
+      "short_name": "Nueva orden",
+      "url": "/repairs/new",
+      "icons": [{ "src": "/logo.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Ver órdenes",
+      "short_name": "Órdenes",
+      "url": "/repairs",
+      "icons": [{ "src": "/logo.png", "sizes": "192x192" }]
+    }
+  ]
+}

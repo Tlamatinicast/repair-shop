@@ -1,0 +1,31 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+
+export async function GET() {
+  const items = await prisma.inventoryItem.findMany({ orderBy: { name: 'asc' } });
+  return NextResponse.json(items);
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const { name, sku, description, quantity, minQuantity, costPrice, salePrice, category, location } = await req.json();
+    if (!name || !sku || !category) return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 });
+    const item = await prisma.inventoryItem.create({
+      data: {
+        name,
+        sku,
+        description: description || null,
+        quantity: parseInt(quantity) || 0,
+        minQuantity: parseInt(minQuantity) || 1,
+        costPrice: parseFloat(costPrice) || 0,
+        salePrice: parseFloat(salePrice) || 0,
+        category,
+        location: location || null,
+      },
+    });
+    return NextResponse.json(item, { status: 201 });
+  } catch (err: any) {
+    if (err.code === 'P2002') return NextResponse.json({ error: 'El SKU ya existe' }, { status: 400 });
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
+  }
+}

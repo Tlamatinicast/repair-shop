@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Customer {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String?
+  phone     String
+  address   String?
+  notes     String?
+  repairs   Repair[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Repair {
+  id           Int           @id @default(autoincrement())
+  ticketNumber String        @unique
+  status       String        @default("RECEIVED")
+  customer     Customer      @relation(fields: [customerId], references: [id])
+  customerId   Int
+  deviceType   String
+  deviceBrand  String
+  deviceModel  String
+  serialNumber String?
+  issue        String
+  diagnosis    String?
+  notes        String?
+  laborCost    Float         @default(0)
+  totalCost    Float         @default(0)
+  password     String?
+  parts        RepairPart[]
+  photos       RepairPhoto[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  deliveredAt  DateTime?
+}
+
+model InventoryItem {
+  id          Int          @id @default(autoincrement())
+  name        String
+  sku         String       @unique
+  description String?
+  quantity    Int          @default(0)
+  minQuantity Int          @default(1)
+  costPrice   Float        @default(0)
+  salePrice   Float        @default(0)
+  category    String
+  location    String?
+  repairParts RepairPart[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model RepairPart {
+  id        Int           @id @default(autoincrement())
+  repair    Repair        @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  repairId  Int
+  item      InventoryItem @relation(fields: [itemId], references: [id])
+  itemId    Int
+  quantity  Int           @default(1)
+  unitPrice Float
+}
+
+model RepairPhoto {
+  id        Int      @id @default(autoincrement())
+  repair    Repair   @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  repairId  Int
+  url       String
+  stage     String   @default("RECEIVED")
+  caption   String?
+  createdAt DateTime @default(now())
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("TECHNICIAN")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

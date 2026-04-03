@@ -1,0 +1,160 @@
+import Link from 'next/link';
+import { prisma } from '@/lib/prisma';
+import { formatCurrency, INVENTORY_CATEGORIES } from '@/lib/utils';
+import { MobileHeader } from '@/components/MobileHeader';
+import { Plus, AlertTriangle } from 'lucide-react';
+
+export const dynamic = 'force-dynamic';
+
+export default async function InventoryPage({ searchParams }: { searchParams: { q?: string; category?: string } }) {
+  const { q, category } = searchParams;
+
+  const items = await prisma.inventoryItem.findMany({
+    where: {
+      ...(category ? { category } : {}),
+      ...(q ? {
+        OR: [
+          { name: { contains: q } },
+          { sku: { contains: q } },
+        ],
+      } : {}),
+    },
+    orderBy: { name: 'asc' },
+  });
+
+  const lowStockCount = items.filter(i => i.quantity <= i.minQuantity).length;
+
+  return (
+    <div className="min-h-screen">
+      <MobileHeader />
+      <div className="p-4 md:p-6 max-w-5xl mx-auto animate-in">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <p className="section-title mb-0.5">Almacén</p>
+            <h1 className="page-title">Inventario</h1>
+          </div>
+          <Link href="/inventory/new" className="btn-primary">
+            <Plus size={15} />
+            <span className="hidden sm:inline">Agregar pieza</span>
+            <span className="sm:hidden">Agregar</span>
+          </Link>
+        </div>
+
+        {lowStockCount > 0 && (
+          <div className="flex items-center gap-2.5 bg-amber-500/10 border border-amber-500/20 rounded-lg px-4 py-3 mb-4 text-sm text-amber-400">
+            <AlertTriangle size={14} />
+            {lowStockCount} {lowStockCount === 1 ? 'artículo tiene' : 'artículos tienen'} stock bajo.
+          </div>
+        )}
+
+        <form className="mb-4">
+          <input name="q" defaultValue={q} placeholder="Buscar por nombre o SKU..." className="input" />
+        </form>
+
+        {/* Category filters - horizontal scroll */}
+        <div className="flex gap-2 mb-5 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap">
+          <CatLink href="/inventory" active={!category} label="Todas" />
+          {INVENTORY_CATEGORIES.map(c => (
+            <CatLink key={c} href={`/inventory?category=${c}`} active={category === c} label={c} />
+          ))}
+        </div>
+
+        {/* Desktop table */}
+        <div className="card overflow-hidden hidden md:block">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-[#1e1e1e]">
+                {['SKU', 'Nombre', 'Categoría', 'Stock', 'P. Costo', 'P. Venta', 'Ubicación', ''].map(h => (
+                  <th key={h} className="text-left px-4 py-3 section-title text-[10px]">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#141414]">
+              {items.map((item) => {
+                const isLow = item.quantity <= item.minQuantity;
+                return (
+                  <tr key={item.id} className="hover:bg-[#131313] transition-colors">
+                    <td className="px-4 py-3 font-mono text-xs text-[#666]">{item.sku}</td>
+                    <td className="px-4 py-3">
+                      <p className="text-sm text-[#ddd] font-medium">{item.name}</p>
+                      {item.description && <p className="text-xs text-[#555] truncate max-w-48">{item.description}</p>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs text-[#888] bg-[#1a1a1a] border border-[#252525] px-2 py-0.5 rounded-md font-mono">{item.category}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        {isLow && <AlertTriangle size={11} className="text-amber-500" />}
+                        <span className={`font-mono text-sm font-medium ${isLow ? 'text-amber-400' : 'text-[#ccc]'}`}>{item.quantity}</span>
+                        <span className="text-xs text-[#555]">/ mín. {item.minQuantity}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-sm text-[#888]">{formatCurrency(item.costPrice)}</td>
+                    <td className="px-4 py-3 font-mono text-sm text-green-400">{formatCurrency(item.salePrice)}</td>
+                    <td className="px-4 py-3 text-xs text-[#555]">{item.location ?? '—'}</td>
+                    <td className="px-4 py-3">
+                      <Link href={`/inventory/${item.id}/edit`} className="text-xs text-[#555] hover:text-amber-400 font-mono transition-colors">editar</Link>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {items.length === 0 && <EmptyState />}
+          {items.length > 0 && (
+            <div className="px-4 py-3 border-t border-[#1a1a1a]">
+              <p className="text-xs text-[#555] font-mono">{items.length} artículo{items.length !== 1 ? 's' : ''}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Mobile cards */}
+        <div className="md:hidden space-y-2">
+          {items.map((item) => {
+            const isLow = item.quantity <= item.minQuantity;
+            return (
+              <Link key={item.id} href={`/inventory/${item.id}/edit`} className="card-hover p-4 block">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex-1 min-w-0 mr-3">
+                    <p className="text-sm font-medium text-[#ddd] truncate">{item.name}</p>
+                    <p className="text-xs text-[#555] font-mono mt-0.5">{item.sku}</p>
+                  </div>
+                  <span className="text-xs text-[#888] bg-[#1a1a1a] border border-[#252525] px-2 py-0.5 rounded-md font-mono flex-shrink-0">{item.category}</span>
+                </div>
+                <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#1a1a1a]">
+                  <div className="flex items-center gap-1.5">
+                    {isLow && <AlertTriangle size={11} className="text-amber-500" />}
+                    <span className={`font-mono text-sm font-medium ${isLow ? 'text-amber-400' : 'text-[#ccc]'}`}>{item.quantity}</span>
+                    <span className="text-xs text-[#555]">en stock</span>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-mono text-green-400">{formatCurrency(item.salePrice)}</p>
+                    <p className="text-[10px] text-[#555]">costo: {formatCurrency(item.costPrice)}</p>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+          {items.length === 0 && <EmptyState />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CatLink({ href, active, label }: { href: string; active: boolean; label: string }) {
+  return (
+    <Link href={href} className={`px-3 py-1.5 rounded-lg text-xs transition-all font-mono whitespace-nowrap flex-shrink-0 ${active ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'text-[#666] hover:text-[#aaa] border border-[#1e1e1e]'}`}>
+      {label}
+    </Link>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="text-center py-16">
+      <p className="text-[#555] text-sm mb-4">No hay artículos.</p>
+      <Link href="/inventory/new" className="btn-primary inline-flex"><Plus size={14} /> Agregar pieza</Link>
+    </div>
+  );
+}
