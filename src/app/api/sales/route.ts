@@ -1,0 +1,108 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const date     = searchParams.get('date');
+  const repairId = searchParams.get('repairId');
+
+  const where = {
+    ...(repairId ? { repairId: Number(repairId) } : {}),
+    ...(date ? {
+      createdAt: {
+        gte: new Date(`${date}T00:00:00`),
+        lte: new Date(`${date}T23:59:59`),
+      },
+    } : {}),
+  };
+
+  const sales = await prisma.sale.findMany({
+    where,
+    include: { customer: true, repair: true, items: { include: { item: true } } },
+    orderBy: { createdAt: 'desc' },
+  });
+  return NextResponse.json(sales);
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { customerId, repairId, items, discount, paymentMethod, notes } = body;
+
+    if (!items || items.length === 0) {
+      return NextResponse.json({ error: 'La venta debe tener al menos un producto' }, { status: 400 });
+    }
+
+    // Validate stock
+    for (const item of items) {
+      const inv = await prisma.inventoryItem.findUnique({ where: { id: item.itemId } });
+      if (!inv) return NextResponse.json({ error: `Producto no encontrado: ${item.name}` }, { status: 400 });
+      if (inv.quantity < item.quantity) {
+        return NextResponse.json({ error: `Stock insuficiente para: ${inv.name} (disponible: ${inv.quantity})` }, { status: 400 });
+      }
+    }
+
+    const subtotal    = items.reduce((s: number, i: any) => s + i.unitPrice * i.quantity, 0);
+    const discountAmt = parseFloat(discount) || 0;
+    const total       = subtotal - discountAmt;
+
+    const count      = await prisma.sale.count();
+    const saleNumber = `VT-${String(count + 1).padStart(4, '0')}`;
+
+    const sale = await prisma.$transaction(async (tx) => {
+      const newSale = await tx.sale.create({
+        data: {
+          saleNumber,
+          customerId:    customerId ? Number(customerId) : null,
+          repairId:      repairId   ? Number(repairId)   : null,
+          subtotal,
+          discount:      discountAmt,
+          total,
+          paymentMethod: paymentMethod || 'CASH',
+          notes:         notes || null,
+          items: {
+            create: items.map((i: any) => ({
+              itemId:    i.itemId,
+              name:      i.name,
+              quantity:  i.quantity,
+              unitPrice: i.unitPrice,
+              subtotal:  i.unitPrice * i.quantity,
+            })),
+          },
+        },
+        include: { customer: true, repair: true, items: { include: { item: true } } },
+      });
+
+      // Discount stock
+      for (const i of items) {
+        await tx.inventoryItem.update({
+          where: { id: i.itemId },
+          data: { quantity: { decrement: i.quantity } },
+        });
+      }
+
+      // If linked to repair, recalculate totalCost from all parts + all sales (including this new one)
+      if (repairId) {
+        const repairWithTotals = await tx.repair.findUnique({
+          where: { id: Number(repairId) },
+          include: { parts: true, sales: true },
+        });
+        if (repairWithTotals) {
+          const partsTotal = repairWithTotals.parts.reduce((s: number, p: any) => s + p.unitPrice * p.quantity, 0);
+          const salesTotal = repairWithTotals.sales.reduce((s: number, sale: any) => s + sale.total, 0);
+          await tx.repair.update({
+            where: { id: Number(repairId) },
+            data: { totalCost: repairWithTotals.laborCost + partsTotal + salesTotal },
+          });
+        }
+      }
+
+      return newSale;
+    });
+
+    return NextResponse.json(sale, { status: 201 });
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: 'Error al procesar la venta' }, { status: 500 });
+  }
+}

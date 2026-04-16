@@ -6,7 +6,7 @@ import { signOut } from 'next-auth/react';
 import Image from 'next/image';
 import {
   LayoutDashboard, Wrench, Users, Package, BarChart3,
-  Settings, ChevronRight, LogOut,
+  ShoppingBag, Settings, ChevronRight, LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -15,6 +15,7 @@ const allNav = [
   { href: '/repairs',   label: 'Reparaciones', icon: Wrench,          adminOnly: false },
   { href: '/customers', label: 'Clientes',     icon: Users,           adminOnly: false },
   { href: '/inventory', label: 'Inventario',   icon: Package,         adminOnly: false },
+  { href: '/sales',     label: 'Ventas',       icon: ShoppingBag,     adminOnly: false },
   { href: '/reports',   label: 'Reportes',     icon: BarChart3,       adminOnly: true  },
 ];
 
@@ -25,7 +26,6 @@ export function Sidebar({ session }: { session: any }) {
 
   return (
     <aside className="w-56 flex-shrink-0 h-screen flex flex-col bg-[#0a0a0a] border-r border-[#1a1a1a]">
-      {/* Logo */}
       <div className="px-5 py-4 border-b border-[#1a1a1a]">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 bg-[#111] flex items-center justify-center">
@@ -40,7 +40,6 @@ export function Sidebar({ session }: { session: any }) {
         </div>
       </div>
 
-      {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5">
         <p className="section-title px-2 mb-3">Menú</p>
         {nav.map(({ href, label, icon: Icon }) => {
@@ -64,7 +63,6 @@ export function Sidebar({ session }: { session: any }) {
         })}
       </nav>
 
-      {/* Bottom */}
       <div className="px-3 py-4 border-t border-[#1a1a1a] space-y-0.5">
         {isAdmin && (
           <Link

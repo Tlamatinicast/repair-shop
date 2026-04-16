@@ -38,25 +38,29 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Get next ticket number
-    const count = await prisma.repair.count();
-    const ticketNumber = `TK-${String(count + 1).padStart(4, '0')}`;
-
-    const repair = await prisma.repair.create({
-      data: {
-        ticketNumber,
-        customerId: customer.id,
-        deviceType,
-        deviceBrand,
-        deviceModel,
-        serialNumber: serialNumber || null,
-        password: password || null,
-        issue,
-        notes: notes || null,
-        status: status || 'RECEIVED',
-        laborCost: parseFloat(laborCost as string) || 0,
-        totalCost: parseFloat(laborCost as string) || 0,
-      },
+    // Create repair first, then assign ticketNumber based on actual DB id
+    // (avoids collisions when orders have been deleted)
+    const repair = await prisma.$transaction(async (tx) => {
+      const newRepair = await tx.repair.create({
+        data: {
+          ticketNumber: `TK-TEMP-${Date.now()}`,
+          customerId: customer.id,
+          deviceType,
+          deviceBrand,
+          deviceModel,
+          serialNumber: serialNumber || null,
+          password: password || null,
+          issue,
+          notes: notes || null,
+          status: status || 'RECEIVED',
+          laborCost: parseFloat(laborCost as string) || 0,
+          totalCost: parseFloat(laborCost as string) || 0,
+        },
+      });
+      return tx.repair.update({
+        where: { id: newRepair.id },
+        data: { ticketNumber: `TK-${String(newRepair.id).padStart(4, '0')}` },
+      });
     });
 
     return NextResponse.json(repair, { status: 201 });

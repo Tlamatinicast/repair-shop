@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Save, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Lock } from 'lucide-react';
 import Link from 'next/link';
 import { DEVICE_TYPES, REPAIR_STATUSES } from '@/lib/utils';
 
@@ -51,6 +51,33 @@ export default function EditRepairPage() {
   };
 
   if (loading) return <div className="p-6 text-[#555] text-sm">Cargando...</div>;
+
+  const isLocked = repair?.status === 'DELIVERED' || repair?.status === 'CANCELLED';
+  if (isLocked) {
+    return (
+      <div className="p-6 max-w-3xl mx-auto animate-in">
+        <div className="flex items-center gap-3 mb-6">
+          <Link href={`/repairs/${id}`} className="btn-ghost"><ArrowLeft size={15} /></Link>
+          <div>
+            <p className="section-title mb-0.5">Editar</p>
+            <h1 className="page-title font-mono">{repair?.ticketNumber}</h1>
+          </div>
+        </div>
+        <div className="card p-8 flex flex-col items-center gap-4 text-center">
+          <Lock size={32} className="text-[#444]" />
+          <div>
+            <p className="text-sm font-semibold text-[#ccc] mb-1">Orden bloqueada</p>
+            <p className="text-xs text-[#555]">
+              No se puede editar una orden con estado <span className="text-amber-400 font-mono">{REPAIR_STATUSES[repair.status as keyof typeof REPAIR_STATUSES]?.label}</span>.
+            </p>
+          </div>
+          <Link href={`/repairs/${id}`} className="btn-secondary text-sm">
+            Volver a la orden
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-3xl mx-auto animate-in">

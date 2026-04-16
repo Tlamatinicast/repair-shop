@@ -15,48 +15,54 @@ model Customer {
   address   String?
   notes     String?
   repairs   Repair[]
+  sales     Sale[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model Repair {
-  id           Int           @id @default(autoincrement())
-  ticketNumber String        @unique
-  status       String        @default("RECEIVED")
-  customer     Customer      @relation(fields: [customerId], references: [id])
-  customerId   Int
-  deviceType   String
-  deviceBrand  String
-  deviceModel  String
-  serialNumber String?
-  issue        String
-  diagnosis    String?
-  notes        String?
-  laborCost    Float         @default(0)
-  totalCost    Float         @default(0)
-  password     String?
-  parts        RepairPart[]
-  photos       RepairPhoto[]
-  repairNotes  RepairNote[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  deliveredAt  DateTime?
+  id             Int           @id @default(autoincrement())
+  ticketNumber   String        @unique
+  status         String        @default("RECEIVED")
+  customer       Customer      @relation(fields: [customerId], references: [id])
+  customerId     Int
+  deviceType     String
+  deviceBrand    String
+  deviceModel    String
+  serialNumber   String?
+  issue          String
+  diagnosis      String?
+  notes          String?
+  laborCost      Float         @default(0)
+  totalCost      Float         @default(0)
+  advancePayment Float         @default(0)
+  paymentStatus  String        @default("PENDING")
+  password       String?
+  parts          RepairPart[]
+  photos         RepairPhoto[]
+  repairNotes    RepairNote[]
+  sales          Sale[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deliveredAt    DateTime?
 }
 
 model InventoryItem {
-  id          Int          @id @default(autoincrement())
-  name        String
-  sku         String       @unique
-  description String?
-  quantity    Int          @default(0)
-  minQuantity Int          @default(1)
-  costPrice   Float        @default(0)
-  salePrice   Float        @default(0)
-  category    String
-  location    String?
-  repairParts RepairPart[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id              Int          @id @default(autoincrement())
+  name            String
+  sku             String       @unique
+  description     String?
+  quantity        Int          @default(0)
+  reservedQty     Int          @default(0)
+  minQuantity     Int          @default(1)
+  costPrice       Float        @default(0)
+  salePrice       Float        @default(0)
+  category        String
+  location        String?
+  repairParts     RepairPart[]
+  saleItems       SaleItem[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 }
 
 model RepairPart {
@@ -67,6 +73,7 @@ model RepairPart {
   itemId    Int
   quantity  Int           @default(1)
   unitPrice Float
+  reserved  Boolean       @default(false)
 }
 
 model RepairPhoto {
@@ -85,10 +92,40 @@ model RepairNote {
   repairId   Int
   content    String
   stage      String   @default("IN_REPAIR")
-  photoUrl   String?
+  photoUrl   String?  // legacy: single photo (kept for backward compatibility)
+  photoUrls  String?  // JSON array of photo URLs, e.g. '["/uploads/notes/1/note-123.webp"]'
   authorName String
   authorRole String
   createdAt  DateTime @default(now())
+}
+
+model Sale {
+  id            Int        @id @default(autoincrement())
+  saleNumber    String     @unique
+  customer      Customer?  @relation(fields: [customerId], references: [id])
+  customerId    Int?
+  repair        Repair?    @relation(fields: [repairId], references: [id])
+  repairId      Int?
+  items         SaleItem[]
+  subtotal      Float      @default(0)
+  discount      Float      @default(0)
+  total         Float      @default(0)
+  paymentMethod String     @default("CASH")
+  notes         String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+model SaleItem {
+  id        Int           @id @default(autoincrement())
+  sale      Sale          @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  saleId    Int
+  item      InventoryItem @relation(fields: [itemId], references: [id])
+  itemId    Int
+  name      String
+  quantity  Int           @default(1)
+  unitPrice Float
+  subtotal  Float
 }
 
 model User {

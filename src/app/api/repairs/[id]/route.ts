@@ -17,6 +17,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const body = await req.json();
     const { status, deviceType, deviceBrand, deviceModel, serialNumber, password, issue, diagnosis, notes, laborCost, totalCost } = body;
     const data: Record<string, any> = {};
+
+    // Check if repair is in a terminal state — only allow status changes
+    const existingRepair = await prisma.repair.findUnique({ where: { id: Number(params.id) } });
+    if (!existingRepair) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
+    const isTerminal = existingRepair.status === 'DELIVERED' || existingRepair.status === 'CANCELLED';
+    if (isTerminal && Object.keys(body).some(k => k !== 'status')) {
+      return NextResponse.json({ error: 'No se puede editar una orden terminada o cancelada.' }, { status: 403 });
+    }
     if (status       !== undefined) { data.status = status; if (status === 'DELIVERED') data.deliveredAt = new Date(); }
     if (deviceType   !== undefined) data.deviceType   = deviceType;
     if (deviceBrand  !== undefined) data.deviceBrand  = deviceBrand;

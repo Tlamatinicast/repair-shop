@@ -2,15 +2,15 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Wrench, Users, Package, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Wrench, Users, ShoppingBag, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const allNav = [
-  { href: '/',          label: 'Inicio',       icon: LayoutDashboard, adminOnly: false },
-  { href: '/repairs',   label: 'Órdenes',      icon: Wrench,          adminOnly: false },
-  { href: '/customers', label: 'Clientes',     icon: Users,           adminOnly: false },
-  { href: '/inventory', label: 'Inventario',   icon: Package,         adminOnly: false },
-  { href: '/reports',   label: 'Reportes',     icon: BarChart3,       adminOnly: true  },
+  { href: '/',          label: 'Inicio',   icon: LayoutDashboard, adminOnly: false },
+  { href: '/repairs',   label: 'Órdenes',  icon: Wrench,          adminOnly: false },
+  { href: '/sales',     label: 'Ventas',   icon: ShoppingBag,     adminOnly: false },
+  { href: '/customers', label: 'Clientes', icon: Users,           adminOnly: false },
+  { href: '/inventory', label: 'Stock',    icon: Package,         adminOnly: false },
 ];
 
 export function BottomNav({ session }: { session: any }) {
@@ -35,9 +35,6 @@ export function BottomNav({ session }: { session: any }) {
             <span className={cn('text-[10px] font-mono', active ? 'text-amber-400' : 'text-[#555]')}>
               {label}
             </span>
-            {active && (
-              <span className="absolute bottom-0 w-6 h-0.5 bg-amber-500 rounded-full" />
-            )}
           </Link>
         );
       })}
