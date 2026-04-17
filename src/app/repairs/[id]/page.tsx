@@ -138,7 +138,7 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
               }))}
               initialSales={repair.sales.map(s => ({
                 id: s.id, saleNumber: s.saleNumber, total: s.total,
-                paymentMethod: s.paymentMethod, createdAt: s.createdAt.toISOString(),
+                createdAt: s.createdAt.toISOString(),
                 items: s.items.map(i => ({ name: i.name, quantity: i.quantity, unitPrice: i.unitPrice })),
               }))}
               initialAdvance={repair.advancePayment}

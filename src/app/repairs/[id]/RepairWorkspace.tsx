@@ -25,7 +25,7 @@ interface Part {
 
 interface Sale {
   id: number; saleNumber: string; total: number;
-  paymentMethod: string; createdAt: string;
+  paymentMethod?: string; createdAt: string;
   items: { name: string; quantity: number; unitPrice: number }[];
 }
 

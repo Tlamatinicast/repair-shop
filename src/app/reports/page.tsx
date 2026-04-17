@@ -38,13 +38,13 @@ export default async function ReportsPage() {
           <h2 className="text-sm font-semibold text-[#ccc] mb-4">Dispositivos más reparados</h2>
           <div className="space-y-3">
             {topDevices.map(({ deviceType, _count }) => {
-              const max = topDevices[0]._count.deviceType;
-              const pct = Math.round((_count.deviceType / max) * 100);
+              const max = (topDevices[0]._count as any).deviceType as number;
+              const pct = Math.round(((_count as any).deviceType / max) * 100);
               return (
                 <div key={deviceType}>
                   <div className="flex justify-between text-xs mb-1">
                     <span className="text-[#ccc]">{deviceType}</span>
-                    <span className="font-mono text-[#666]">{_count.deviceType}</span>
+                    <span className="font-mono text-[#666]">{(_count as any).deviceType}</span>
                   </div>
                   <div className="h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
                     <div className="h-full bg-amber-500/60 rounded-full transition-all" style={{ width: `${pct}%` }} />

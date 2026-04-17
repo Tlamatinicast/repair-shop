@@ -71,14 +71,14 @@ export default function NewInventoryPage() {
   );
 }
 
-function Field({ label, name, type = 'text', required, placeholder, defaultValue, className = '' }: {
+function Field({ label, name, type = 'text', required, placeholder, defaultValue, className = '', step }: {
   label: string; name: string; type?: string; required?: boolean;
-  placeholder?: string; defaultValue?: string; className?: string;
+  placeholder?: string; defaultValue?: string; className?: string; step?: string;
 }) {
   return (
     <div className={className}>
       <label className="label">{label}</label>
-      <input name={name} type={type} required={required} placeholder={placeholder} defaultValue={defaultValue} className="input" />
+      <input name={name} type={type} required={required} placeholder={placeholder} defaultValue={defaultValue} step={step} className="input" />
     </div>
   );
 }

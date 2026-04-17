@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/authOptions';
 import { prisma } from '@/lib/prisma';
 import { writeFile, mkdir, unlink } from 'fs/promises';
 import { existsSync } from 'fs';
@@ -28,11 +28,10 @@ async function compressAndSave(file: File, dir: string, name: string): Promise<s
 
   try {
     const sharp = (await import('sharp')).default;
-    buffer = await sharp(buffer)
+    buffer = Buffer.from(await sharp(buffer as Buffer)
       .resize(1920, 1920, { fit: 'inside', withoutEnlargement: true })
-      // WebP: ~25-35% smaller than JPEG at equivalent quality
       .webp({ quality: 72, effort: 4 })
-      .toBuffer();
+      .toBuffer());
   } catch { /* sharp not available, store original */ }
 
   if (!existsSync(dir)) await mkdir(dir, { recursive: true });

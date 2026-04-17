@@ -60,7 +60,7 @@ export function SaleReceiptButton({ sale }: { sale: SaleData }) {
         day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
       });
       doc.text(dateStr, m, y); y += 4;
-      doc.text(`Pago: ${PAYMENT_LABELS[sale.paymentMethod] ?? sale.paymentMethod}`, m, y); y += 4;
+      if (sale.paymentMethod) { doc.text(`Pago: ${PAYMENT_LABELS[sale.paymentMethod] ?? sale.paymentMethod}`, m, y); y += 4; }
       if (sale.customer) {
         doc.text(`Cliente: ${sale.customer.name}`, m, y); y += 4;
       }

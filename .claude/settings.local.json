@@ -4,7 +4,10 @@
       "Bash(npx prisma *)",
       "Bash(node -e ' *)",
       "WebFetch(domain:spotspos.com)",
-      "WebFetch(domain:samiiweb.com)"
+      "WebFetch(domain:samiiweb.com)",
+      "Bash(npm install *)",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/next/package.json'\\).version\\)\")",
+      "Bash(npm run *)"
     ]
   }
 }
