@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { apiRequireAuth } from '@/lib/auth';
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
+  const { error } = await apiRequireAuth();
+  if (error) return error;
   const parts = await prisma.repairPart.findMany({
     where: { repairId: Number(params.id) },
     include: { item: true },
@@ -27,6 +30,8 @@ async function recalcRepairTotal(tx: any, repairId: number) {
 }
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const { error } = await apiRequireAuth();
+  if (error) return error;
   try {
     const { itemId, quantity, unitPrice, reserved } = await req.json();
     const repairId = Number(params.id);
@@ -75,6 +80,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const { error } = await apiRequireAuth();
+  if (error) return error;
   try {
     const { partId } = await req.json();
     const repairId = Number(params.id);
@@ -113,6 +120,8 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const { error } = await apiRequireAuth();
+  if (error) return error;
   try {
     const { partId } = await req.json();
     const repairId = Number(params.id);

@@ -22,6 +22,7 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
         parts: { include: { item: true } },
         repairNotes: { orderBy: { createdAt: 'desc' } },
         sales: { include: { items: true }, orderBy: { createdAt: 'desc' } },
+        statusLogs: { orderBy: { startedAt: 'asc' } },
       },
     }),
     getSession(),
@@ -166,17 +167,72 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                 repairId={repair.id}
                 currentStatus={repair.status as RepairStatus}
                 paymentStatus={repair.paymentStatus}
+                partsEta={(repair as any).partsEta?.toISOString() ?? null}
               />
             </div>
 
-            {/* History */}
+            {/* Tiempos */}
             <div className="card p-5">
-              <p className="section-title mb-4">Historial</p>
-              <div className="space-y-2 text-xs text-[#666] font-mono">
-                <p>Recibido: {formatDate(repair.createdAt)}</p>
-                <p>Actualizado: {formatDate(repair.updatedAt)}</p>
-                {repair.deliveredAt && <p className="text-green-500">Entregado: {formatDate(repair.deliveredAt)}</p>}
+              <div className="flex items-center gap-2 pb-3 border-b border-[#1a1a1a] mb-4">
+                <Clock size={14} className="text-amber-500" />
+                <h2 className="text-sm font-semibold text-[#ccc]">Tiempos de servicio</h2>
               </div>
+
+              {/* Fechas clave */}
+              <div className="space-y-1.5 mb-4">
+                {(repair as any).queueDate && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-[#666]">Entrada a diagnóstico</span>
+                    <span className="font-mono text-amber-400">{formatDate((repair as any).queueDate)}</span>
+                  </div>
+                )}
+                {(repair as any).partsEta && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-[#666]">Llegada estimada de piezas</span>
+                    <span className="font-mono text-blue-400">{formatDate((repair as any).partsEta)}</span>
+                  </div>
+                )}
+                {(repair as any).dueDate && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-[#666]">Entrega estimada</span>
+                    <span className="font-mono text-green-400">{formatDate((repair as any).dueDate)}</span>
+                  </div>
+                )}
+                {repair.deliveredAt && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-[#666]">Entregado</span>
+                    <span className="font-mono text-green-400">{formatDate(repair.deliveredAt)}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Status log timeline */}
+              {(repair as any).statusLogs?.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[10px] text-[#555] uppercase tracking-wide mb-2">Tiempo por etapa</p>
+                  {(repair as any).statusLogs.map((log: any, i: number) => {
+                    const start = new Date(log.startedAt);
+                    const end   = log.endedAt ? new Date(log.endedAt) : new Date();
+                    const mins  = Math.floor((end.getTime() - start.getTime()) / 60000);
+                    const days  = Math.floor(mins / 1440);
+                    const hrs   = Math.floor((mins % 1440) / 60);
+                    const dur   = days > 0 ? `${days}d ${hrs}h` : hrs > 0 ? `${hrs}h ${mins % 60}m` : `${mins}m`;
+                    const label = REPAIR_STATUSES[log.status as RepairStatus]?.label ?? log.status;
+                    const isActive = !log.endedAt;
+                    return (
+                      <div key={log.id} className="flex items-center gap-3">
+                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isActive ? 'bg-amber-400' : 'bg-[#333]'}`} />
+                        <div className="flex-1 flex justify-between items-center">
+                          <span className={`text-xs ${isActive ? 'text-amber-400' : 'text-[#666]'}`}>{label}</span>
+                          <span className={`text-xs font-mono ${isActive ? 'text-amber-400' : 'text-[#555]'}`}>
+                            {dur}{isActive ? ' (en curso)' : ''}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>

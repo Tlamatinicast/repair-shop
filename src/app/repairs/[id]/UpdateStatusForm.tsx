@@ -9,13 +9,15 @@ interface Props {
   repairId: number;
   currentStatus: RepairStatus;
   paymentStatus: string;
+  partsEta?: string | null;
 }
 
-export function UpdateStatusForm({ repairId, currentStatus, paymentStatus }: Props) {
+export function UpdateStatusForm({ repairId, currentStatus, paymentStatus, partsEta: initialPartsEta }: Props) {
   const router = useRouter();
   const [status, setStatus] = useState(currentStatus);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [partsEta, setPartsEta] = useState(initialPartsEta ? new Date(initialPartsEta).toISOString().split('T')[0] : '');
 
   // Terminal states: no status change allowed once in these
   const isTerminal = currentStatus === 'DELIVERED' || currentStatus === 'CANCELLED';
@@ -47,7 +49,10 @@ export function UpdateStatusForm({ repairId, currentStatus, paymentStatus }: Pro
     const res = await fetch(`/api/repairs/${repairId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({
+        status,
+        ...(status === 'WAITING_PARTS' && partsEta ? { partsEta } : {}),
+      }),
     });
 
     if (!res.ok) {
@@ -81,6 +86,21 @@ export function UpdateStatusForm({ repairId, currentStatus, paymentStatus }: Pro
           <option key={k} value={k}>{v.label}</option>
         ))}
       </select>
+
+      {/* partsEta field when waiting for parts */}
+      {status === 'WAITING_PARTS' && (
+        <div>
+          <label className="label">Fecha estimada de llegada de piezas</label>
+          <input
+            type="date"
+            value={partsEta}
+            onChange={e => setPartsEta(e.target.value)}
+            className="input"
+            min={new Date().toISOString().split('T')[0]}
+          />
+          <p className="text-[11px] text-[#555] mt-1">Nacional ~3-5 días · Internacional ~3-4 semanas · Stock: hoy</p>
+        </div>
+      )}
 
       {/* Warning when trying to deliver with pending payment */}
       {status === 'DELIVERED' && paymentStatus !== 'PAID' && (

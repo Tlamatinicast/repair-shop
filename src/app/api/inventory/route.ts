@@ -1,24 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { apiRequireAuth } from '@/lib/auth';
 
 export async function GET() {
+  const { error } = await apiRequireAuth();
+  if (error) return error;
   const items = await prisma.inventoryItem.findMany({ orderBy: { name: 'asc' } });
   return NextResponse.json(items);
 }
 
 export async function POST(req: NextRequest) {
+  const { error } = await apiRequireAuth();
+  if (error) return error;
   try {
     const { name, sku, description, quantity, minQuantity, costPrice, salePrice, category, location } = await req.json();
     if (!name || !sku || !category) return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 });
     const item = await prisma.inventoryItem.create({
       data: {
-        name,
-        sku,
+        name, sku,
         description: description || null,
-        quantity: parseInt(quantity) || 0,
+        quantity:    parseInt(quantity)    || 0,
         minQuantity: parseInt(minQuantity) || 1,
-        costPrice: parseFloat(costPrice) || 0,
-        salePrice: parseFloat(salePrice) || 0,
+        costPrice:   parseFloat(costPrice) || 0,
+        salePrice:   parseFloat(salePrice) || 0,
         category,
         location: location || null,
       },

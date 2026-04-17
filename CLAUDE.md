@@ -148,14 +148,35 @@ Todo el trabajo de la sesión está **pendiente de commitear**:
 
 ---
 
-## Próximos pasos sugeridos
+## Roadmap — funciones pendientes
 
-- [ ] Notificaciones al cliente (WhatsApp / SMS) al cambiar de estado de reparación
-- [ ] Módulo de garantías — folio con fecha de vencimiento al entregar equipo
+> Comparado contra **Samii** (samiiweb.com) y **SpotsPOS** (spotspos.com).
+> Ordenar por impacto al elegir qué trabajar en cada sesión.
+
+### De Samii
+- [ ] Fechas límite de entrega por orden
+- [ ] Checklist de revisión/diagnóstico personalizable por orden
+- [ ] Statuses de reparación personalizables (no fijos en código)
+- [ ] Módulo de garantías — folio con fecha de vencimiento al entregar
+- [ ] Módulo de proveedores
+- [ ] Control de gastos fijos y variables (renta, luz, sueldos, etc.)
+- [ ] Órdenes de compra de inventario
+- [ ] Notificaciones WhatsApp/correo al cambiar estado *(sin API de pago — botón de link prellenado)*
+- [ ] Impresión térmica y stickers
+- [ ] Módulo de finanzas (balance general)
+
+### De SpotsPOS
+- [ ] Roles más granulares (Gerente, Contable, Empleado)
+- [ ] Gestor de empleados (checadas, horarios, desempeño)
+- [ ] Multi-sucursal
+- [ ] Análisis de horas pico y reportes avanzados con gráficas
+- [ ] CRM con automatización de comunicaciones
+
+### Independientes (propias de TLAMATECH)
+- [ ] Exportación CSV/Excel por módulo *(Admin only)*
+- [ ] Importación de inventario desde Excel *(tienes un Excel con refacciones)*
+- [ ] DB limpia sin datos demo para producción
 - [ ] Expansión de `deviceType` para módulos vehiculares y dispositivos médicos
-- [ ] Reportes avanzados con gráficas (ingresos por semana/mes, por tipo de dispositivo)
-- [ ] Exportación a CSV / Excel
-- [ ] Gestión de empleados y roles más granular
 
 ---
 

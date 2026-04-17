@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { REPAIR_STATUSES, formatCurrency, formatDate, type RepairStatus } from '@/lib/utils';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { MobileHeader } from '@/components/MobileHeader';
-import { Plus } from 'lucide-react';
+import { Plus, AlertCircle } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +27,7 @@ export default async function RepairsPage({
       } : {}),
     },
     include: { customer: true },
-    orderBy: { id: 'desc' },
+    orderBy: { createdAt: 'desc' },
   });
 
   return (
@@ -81,9 +81,12 @@ export default async function RepairsPage({
                 {repairs.map((r) => (
                   <tr key={r.id} className="group hover:bg-[#131313] transition-colors">
                     <td className="px-4 py-3">
-                      <Link href={`/repairs/${r.id}`} className="font-mono text-xs text-amber-500 hover:text-amber-400">
-                        {r.ticketNumber}
-                      </Link>
+                      <div className="flex items-center gap-1.5">
+                        <Link href={`/repairs/${r.id}`} className="font-mono text-xs text-amber-500 hover:text-amber-400">
+                          {r.ticketNumber}
+                        </Link>
+                        <QueueAlert repair={r} />
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <p className="text-sm text-[#ccc]">{r.customer.name}</p>
@@ -121,7 +124,10 @@ export default async function RepairsPage({
             <Link key={r.id} href={`/repairs/${r.id}`} className="card-hover p-4 block">
               <div className="flex items-start justify-between mb-2">
                 <div>
-                  <span className="font-mono text-xs text-amber-500">{r.ticketNumber}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-xs text-amber-500">{r.ticketNumber}</span>
+                    <QueueAlert repair={r} />
+                  </div>
                   <p className="text-sm font-medium text-[#ddd] mt-0.5">{r.deviceBrand} {r.deviceModel}</p>
                   <p className="text-xs text-[#666]">{r.deviceType}</p>
                 </div>
@@ -148,6 +154,22 @@ export default async function RepairsPage({
         </div>
       </div>
     </div>
+  );
+}
+
+function QueueAlert({ repair }: { repair: any }) {
+  if (!repair.queueDate) return null;
+  const isTerminal = repair.status === 'DELIVERED' || repair.status === 'CANCELLED';
+  if (isTerminal) return null;
+  const now   = new Date();
+  const queue = new Date(repair.queueDate);
+  const overdue = queue < now;
+  const soon    = !overdue && (queue.getTime() - now.getTime()) < 1000 * 60 * 60 * 24 * 2; // 2 días
+  if (!overdue && !soon) return null;
+  return (
+    <span title={overdue ? 'Cola vencida' : 'Entra a cola pronto'}>
+      <AlertCircle size={11} className={overdue ? 'text-red-400' : 'text-amber-400'} />
+    </span>
   );
 }
 

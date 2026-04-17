@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { apiRequireAuth } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
+  const { error } = await apiRequireAuth();
+  if (error) return error;
   const { searchParams } = new URL(req.url);
   const date     = searchParams.get('date');
   const repairId = searchParams.get('repairId');
@@ -25,6 +28,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const { error } = await apiRequireAuth();
+  if (error) return error;
   try {
     const body = await req.json();
     const { customerId, repairId, items, discount, paymentMethod, notes, initialPayment } = body;

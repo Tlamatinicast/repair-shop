@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { apiRequireAuth } from '@/lib/auth';
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const { error } = await apiRequireAuth();
+  if (error) return error;
   try {
     const { advancePayment, paymentStatus } = await req.json();
 

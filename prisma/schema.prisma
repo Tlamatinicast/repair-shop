@@ -21,30 +21,44 @@ model Customer {
 }
 
 model Repair {
-  id             Int           @id @default(autoincrement())
-  ticketNumber   String        @unique
-  status         String        @default("RECEIVED")
-  customer       Customer      @relation(fields: [customerId], references: [id])
-  customerId     Int
-  deviceType     String
-  deviceBrand    String
-  deviceModel    String
-  serialNumber   String?
-  issue          String
-  diagnosis      String?
-  notes          String?
-  laborCost      Float         @default(0)
-  totalCost      Float         @default(0)
-  advancePayment Float         @default(0)
-  paymentStatus  String        @default("PENDING")
-  password       String?
-  parts          RepairPart[]
-  photos         RepairPhoto[]
-  repairNotes    RepairNote[]
-  sales          Sale[]
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  deliveredAt    DateTime?
+  id                Int                @id @default(autoincrement())
+  ticketNumber      String             @unique
+  status            String             @default("RECEIVED")
+  customer          Customer           @relation(fields: [customerId], references: [id])
+  customerId        Int
+  deviceType        String
+  deviceBrand       String
+  deviceModel       String
+  serialNumber      String?
+  issue             String
+  diagnosis         String?
+  notes             String?
+  laborCost         Float              @default(0)
+  totalCost         Float              @default(0)
+  advancePayment    Float              @default(0)
+  paymentStatus     String             @default("PENDING")
+  password          String?
+  isDefinedService  Boolean            @default(false)
+  queueDate         DateTime?
+  dueDate           DateTime?
+  partsEta          DateTime?
+  parts             RepairPart[]
+  photos            RepairPhoto[]
+  repairNotes       RepairNote[]
+  statusLogs        RepairStatusLog[]
+  sales             Sale[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deliveredAt       DateTime?
+}
+
+model RepairStatusLog {
+  id        Int      @id @default(autoincrement())
+  repair    Repair   @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  repairId  Int
+  status    String
+  startedAt DateTime @default(now())
+  endedAt   DateTime?
 }
 
 model InventoryItem {

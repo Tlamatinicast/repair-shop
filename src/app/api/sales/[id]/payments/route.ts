@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { apiRequireAuth } from '@/lib/auth';
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const { error } = await apiRequireAuth();
+  if (error) return error;
   try {
     const { amount, paymentMethod, notes } = await req.json();
     const saleId = Number(params.id);

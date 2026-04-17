@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx prisma *)",
+      "Bash(node -e ' *)",
+      "WebFetch(domain:spotspos.com)",
+      "WebFetch(domain:samiiweb.com)"
+    ]
+  }
+}

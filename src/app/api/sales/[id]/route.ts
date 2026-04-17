@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
+import { apiRequireAuth, apiRequireAdmin } from '@/lib/auth';
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
+  const { error } = await apiRequireAuth();
+  if (error) return error;
   const sale = await prisma.sale.findUnique({
     where: { id: Number(params.id) },
     include: { customer: true, items: { include: { item: true } }, payments: { orderBy: { createdAt: 'asc' } } },
@@ -13,10 +14,8 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 }
 
 export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session || (session.user as any).role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Solo el administrador puede cancelar ventas' }, { status: 403 });
-  }
+  const { error } = await apiRequireAdmin();
+  if (error) return error;
 
   // Restore stock
   const sale = await prisma.sale.findUnique({
