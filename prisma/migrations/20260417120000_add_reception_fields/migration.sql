@@ -1,0 +1,8 @@
+-- AlterTable
+ALTER TABLE "Repair" ADD COLUMN "contactPreference" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "Repair" ADD COLUMN "accessories" TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE "Repair" ADD COLUMN "physicalCondition" TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE "Repair" ADD COLUMN "physicalNotes" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "Repair" ADD COLUMN "serviceType" TEXT NOT NULL DEFAULT 'DIAGNOSIS';
+ALTER TABLE "Repair" ADD COLUMN "authorizedDiagnosis" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Repair" ADD COLUMN "clientSignature" TEXT NOT NULL DEFAULT '';

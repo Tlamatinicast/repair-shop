@@ -19,6 +19,15 @@ interface Repair {
   paymentStatus: string;
   status: string;
   createdAt: string;
+  dueDate?: string | null;
+  password?: string | null;
+  contactPreference?: string;
+  accessories?: string;
+  physicalCondition?: string;
+  physicalNotes?: string;
+  serviceType?: string;
+  authorizedDiagnosis?: boolean;
+  clientSignature?: string;
   customer: {
     name: string;
     phone: string;
@@ -29,97 +38,189 @@ interface Repair {
 
 const fmt = (n: number) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n);
 
+const ACCESSORY_LABELS: Record<string, string> = {
+  NONE: 'Ninguno / N.A.', CHARGER: 'Cargador', CABLE: 'Cable de corriente',
+  CASE: 'Funda', BOX: 'Caja', ADAPTERS: 'Adaptadores', OTHER: 'Otros',
+};
+const CONDITION_LABELS: Record<string, string> = {
+  NONE: 'Sin daños externos', BROKEN_SCREEN: 'Pantalla rota', SCRATCHES: 'Rayones',
+  DENTS: 'Golpes / abolladuras', MISSING_SCREWS: 'Tornillos faltantes',
+  WATER_DAMAGE: 'Equipo mojado / humedad', PREVIOUSLY_OPENED: 'Equipo previamente abierto',
+};
+const SERVICE_LABELS: Record<string, string> = {
+  DIAGNOSIS: 'Diagnóstico', DIRECT_REPAIR: 'Reparación directa', GENERAL_REVIEW: 'Revisión general',
+};
+const CONTACT_LABELS: Record<string, string> = {
+  WHATSAPP: 'WhatsApp', CALL: 'Llamada telefónica', EMAIL: 'Correo electrónico',
+};
+
 export function TicketButtons({ repair }: { repair: Repair }) {
   const [loadingClient,   setLoadingClient]   = useState(false);
   const [loadingInternal, setLoadingInternal] = useState(false);
   const [loadingDelivery, setLoadingDelivery] = useState(false);
 
-  // ── CLIENT TICKET (A4 intake) ────────────────────────
+  // ── CLIENT TICKET (A4 intake) ────────────────────────────────────────────
   const generateClientTicket = async () => {
     setLoadingClient(true);
     try {
       const { jsPDF } = await import('jspdf');
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      const pageW = 210; const margin = 18; const contentW = pageW - margin * 2;
+      const pageW = 210; const margin = 15; const contentW = pageW - margin * 2;
       let y = 0;
 
+      const accessories     = JSON.parse(repair.accessories     || '[]') as string[];
+      const physicalCond    = JSON.parse(repair.physicalCondition || '[]') as string[];
+      const accessoryLabels = accessories.map(a => ACCESSORY_LABELS[a] || a).join(', ') || '—';
+      const conditionLabels = physicalCond.map(c => CONDITION_LABELS[c] || c).join(', ') || '—';
+
+      // ── Header ──────────────────────────────────────────────────────────
       doc.setFillColor(10, 10, 10);
-      doc.rect(0, 0, pageW, 38, 'F');
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(251, 191, 36);
-      doc.text('TLAMATECH', margin, 16);
-      doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(150, 150, 150);
-      doc.text('TALLER DE REPARACIÓN DE DISPOSITIVOS', margin, 22);
-      doc.text('Mérida, Yucatán · tlamatech.com', margin, 27);
-      doc.setFont('courier', 'bold'); doc.setFontSize(11); doc.setTextColor(251, 191, 36);
-      doc.text(repair.ticketNumber, pageW - margin, 16, { align: 'right' });
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(120, 120, 120);
-      doc.text('ORDEN DE RECEPCIÓN', pageW - margin, 21, { align: 'right' });
-      doc.text(new Date(repair.createdAt).toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' }), pageW - margin, 26, { align: 'right' });
+      doc.rect(0, 0, pageW, 42, 'F');
 
-      y = 46;
-      const section = (title: string) => {
-        doc.setFillColor(245, 245, 245); doc.rect(margin, y, contentW, 7, 'F');
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(80, 80, 80);
-        doc.text(title.toUpperCase(), margin + 3, y + 5); y += 11;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(20); doc.setTextColor(251, 191, 36);
+      doc.text('TLAMATECH', margin, 14);
+      doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(120, 120, 120);
+      doc.text('TALLER DE REPARACIÓN DE DISPOSITIVOS ELECTRÓNICOS', margin, 20);
+      doc.text('Mérida, Yucatán · tlamatech.com', margin, 25.5);
+      doc.setFontSize(7); doc.setTextColor(80, 80, 80);
+      doc.text('ORDEN DE RECEPCIÓN', margin, 35);
+
+      // Folio grande a la derecha
+      doc.setFont('courier', 'bold'); doc.setFontSize(22); doc.setTextColor(251, 191, 36);
+      doc.text(repair.ticketNumber, pageW - margin, 18, { align: 'right' });
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(120, 120, 120);
+      doc.text(new Date(repair.createdAt).toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' }), pageW - margin, 25, { align: 'right' });
+      if (repair.dueDate) {
+        doc.setTextColor(251, 191, 36);
+        doc.text(`Entrega est.: ${new Date(repair.dueDate).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}`, pageW - margin, 31, { align: 'right' });
+      }
+
+      y = 50;
+
+      const sectionHeader = (title: string) => {
+        doc.setFillColor(22, 22, 22); doc.rect(margin, y, contentW, 6.5, 'F');
+        doc.setDrawColor(40, 40, 40); doc.rect(margin, y, contentW, 6.5, 'S');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(160, 120, 40);
+        doc.text(title.toUpperCase(), margin + 3, y + 4.5);
+        y += 10;
       };
+
       const row = (label: string, value: string, bold = false) => {
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(100, 100, 100);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(120, 120, 120);
         doc.text(label, margin + 2, y);
-        doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setTextColor(30, 30, 30);
-        const lines = doc.splitTextToSize(value || '—', contentW - 55);
-        doc.text(lines, margin + 52, y); y += Math.max(lines.length * 5.5, 6.5);
+        doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setTextColor(220, 220, 220);
+        const lines = doc.splitTextToSize(value || '—', contentW - 52);
+        doc.text(lines, margin + 52, y);
+        y += Math.max(lines.length * 5.2, 6);
       };
 
-      section('Datos del cliente');
+      // ── Cliente ─────────────────────────────────────────────────────────
+      sectionHeader('Datos del cliente');
       row('Nombre:', repair.customer.name, true);
       row('Teléfono:', repair.customer.phone);
-      if (repair.customer.email)   row('Correo:', repair.customer.email);
-      if (repair.customer.address) row('Dirección:', repair.customer.address);
-      y += 3;
+      if (repair.customer.email) row('Correo:', repair.customer.email);
+      if (repair.contactPreference) row('Contactar por:', CONTACT_LABELS[repair.contactPreference] || repair.contactPreference);
+      y += 2;
 
-      section('Dispositivo recibido');
+      // ── Dispositivo ─────────────────────────────────────────────────────
+      sectionHeader('Dispositivo recibido');
       row('Tipo:', repair.deviceType);
       row('Marca / Modelo:', `${repair.deviceBrand} ${repair.deviceModel}`, true);
       if (repair.serialNumber) row('No. Serie:', repair.serialNumber);
+      if (repair.password && repair.password !== 'N/A') row('Contraseña:', repair.password);
+      y += 2;
+
+      // ── Accesorios ──────────────────────────────────────────────────────
+      sectionHeader('Accesorios entregados');
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(220, 220, 220);
+      const accLines = doc.splitTextToSize(accessoryLabels, contentW - 6);
+      doc.text(accLines, margin + 3, y);
+      y += accLines.length * 5.2 + 4;
+
+      // ── Estado físico ────────────────────────────────────────────────────
+      sectionHeader('Estado físico al recibir');
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(220, 220, 220);
+      const condLines = doc.splitTextToSize(conditionLabels, contentW - 6);
+      doc.text(condLines, margin + 3, y);
+      y += condLines.length * 5.2 + 2;
+      if (repair.physicalNotes && repair.physicalNotes.trim()) {
+        doc.setTextColor(150, 150, 150); doc.setFontSize(7.5);
+        doc.text('Obs.:', margin + 3, y);
+        const notesLines = doc.splitTextToSize(repair.physicalNotes, contentW - 18);
+        doc.text(notesLines, margin + 14, y);
+        y += notesLines.length * 5 + 2;
+      }
+      y += 2;
+
+      // ── Problema ─────────────────────────────────────────────────────────
+      sectionHeader('Problema reportado');
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(220, 220, 220);
+      const issueLines = doc.splitTextToSize(repair.issue, contentW - 6);
+      doc.text(issueLines, margin + 3, y);
+      y += issueLines.length * 5.2 + 4;
+
+      // ── Servicio y costo ─────────────────────────────────────────────────
+      sectionHeader('Tipo de servicio y costo estimado');
+      if (repair.serviceType) row('Tipo de servicio:', SERVICE_LABELS[repair.serviceType] || repair.serviceType);
+      doc.setFillColor(20, 15, 5); doc.rect(margin, y, contentW, 10, 'F');
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(120, 120, 120);
+      doc.text('Costo estimado de mano de obra:', margin + 3, y + 6.5);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(251, 191, 36);
+      doc.text(repair.laborCost > 0 ? fmt(repair.laborCost) : 'Por cotizar', pageW - margin - 3, y + 7, { align: 'right' });
+      y += 14;
+
+      doc.setFont('helvetica', 'italic'); doc.setFontSize(7); doc.setTextColor(80, 80, 80);
+      doc.text('* Las piezas pueden generar cargos adicionales.', margin + 3, y);
+      y += 5;
+
+      if (repair.authorizedDiagnosis) {
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(80, 160, 80);
+        doc.text('✓ Cliente autorizó diagnóstico y cargos adicionales', margin + 3, y);
+        y += 6;
+      }
       y += 3;
 
-      section('Problema reportado');
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(30, 30, 30);
-      const issueLines = doc.splitTextToSize(repair.issue, contentW - 6);
-      doc.text(issueLines, margin + 3, y); y += issueLines.length * 5.5 + 5;
-
-      section('Condición física del equipo');
-      doc.setDrawColor(200, 200, 200); doc.rect(margin, y, contentW, 20, 'S');
-      doc.setFontSize(7.5); doc.setTextColor(160, 160, 160);
-      doc.text('Observaciones del técnico al momento de recibir el equipo:', margin + 3, y + 5); y += 24;
-
-      section('Costo estimado de mano de obra');
-      doc.setFillColor(255, 251, 235); doc.rect(margin, y, contentW, 12, 'F');
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(180, 120, 10);
-      const cost = repair.laborCost;
-      doc.text(cost > 0 ? fmt(cost) : 'Por cotizar', pageW - margin - 3, y + 8, { align: 'right' });
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(120, 120, 120);
-      doc.text('Costo estimado de mano de obra (piezas pueden generar cargos adicionales)', margin + 3, y + 8); y += 16;
-
-      y += 2;
-      doc.setFontSize(7); doc.setTextColor(130, 130, 130); doc.setFont('helvetica', 'bold');
-      doc.text('TÉRMINOS Y CONDICIONES:', margin, y); y += 4.5;
+      // ── Términos condensados ─────────────────────────────────────────────
+      doc.setFontSize(6.5); doc.setTextColor(70, 70, 70); doc.setFont('helvetica', 'bold');
+      doc.text('TÉRMINOS Y CONDICIONES:', margin, y); y += 4;
       doc.setFont('helvetica', 'normal');
-      ['1. Tiempo de reparación estimado: 3 a 7 días hábiles, sujeto a disponibilidad de piezas.',
-       '2. TLAMATECH no se responsabiliza por pérdida de datos. Se recomienda respaldar su información.',
-       '3. Equipos no reclamados después de 30 días generarán cargo por almacenaje.',
-       '4. El presupuesto puede variar una vez realizado el diagnóstico técnico completo.',
-       '5. Garantía: 30 días en mano de obra y 90 días en piezas instaladas.',
-      ].forEach(t => { const tl = doc.splitTextToSize(t, contentW); doc.text(tl, margin, y); y += tl.length * 4 + 1.5; });
+      [
+        '1. Tiempo estimado: 3–7 días hábiles, sujeto a disponibilidad de piezas.',
+        '2. TLAMATECH no se responsabiliza por pérdida de datos. Respalde su información.',
+        '3. Equipos no reclamados después de 30 días generarán cargo por almacenaje.',
+        '4. Garantía: 30 días en mano de obra y 90 días en piezas instaladas.',
+      ].forEach(t => {
+        const tl = doc.splitTextToSize(t, contentW);
+        doc.text(tl, margin, y);
+        y += tl.length * 3.8 + 1;
+      });
+      y += 4;
 
-      y += 8;
-      doc.setDrawColor(180, 180, 180);
-      doc.line(margin, y + 14, margin + 70, y + 14);
-      doc.setFontSize(7.5); doc.setTextColor(100, 100, 100);
-      doc.text('Firma del cliente', margin, y + 19); doc.text(repair.customer.name, margin, y + 23);
-      doc.line(pageW - margin - 70, y + 14, pageW - margin, y + 14);
-      doc.text('Recibido por (técnico)', pageW - margin - 70, y + 19);
+      // ── Firma ────────────────────────────────────────────────────────────
+      if (repair.clientSignature && repair.clientSignature.length > 50) {
+        sectionHeader('Firma del cliente');
+        try {
+          doc.addImage(repair.clientSignature, 'PNG', margin + 2, y, 80, 22);
+        } catch {}
+        y += 26;
+        doc.setDrawColor(60, 60, 60);
+        doc.line(margin + 2, y, margin + 82, y);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(100, 100, 100);
+        doc.text(repair.customer.name, margin + 2, y + 4);
+        y += 8;
+      } else {
+        y += 6;
+        doc.setDrawColor(60, 60, 60);
+        doc.line(margin, y + 16, margin + 80, y + 16);
+        doc.line(pageW - margin - 70, y + 16, pageW - margin, y + 16);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(100, 100, 100);
+        doc.text('Firma del cliente', margin, y + 21);
+        doc.text(repair.customer.name, margin, y + 25);
+        doc.text('Recibido por (técnico)', pageW - margin - 70, y + 21);
+        y += 28;
+      }
 
+      // ── Footer ───────────────────────────────────────────────────────────
       doc.setFillColor(10, 10, 10); doc.rect(0, 285, pageW, 12, 'F');
       doc.setFont('courier', 'bold'); doc.setFontSize(7); doc.setTextColor(251, 191, 36);
       doc.text(repair.ticketNumber, margin, 291);
@@ -132,7 +233,7 @@ export function TicketButtons({ repair }: { repair: Repair }) {
     finally { setLoadingClient(false); }
   };
 
-  // ── DELIVERY TICKET (A4 full summary) ────────────────
+  // ── DELIVERY TICKET (A4 full summary) ────────────────────────────────────
   const generateDeliveryTicket = async () => {
     setLoadingDelivery(true);
     try {
@@ -154,7 +255,6 @@ export function TicketButtons({ repair }: { repair: Repair }) {
       const pageW = 210; const margin = 18; const contentW = pageW - margin * 2;
       let y = 0;
 
-      // Header
       doc.setFillColor(10, 10, 10); doc.rect(0, 0, pageW, 38, 'F');
       doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(251, 191, 36);
       doc.text('TLAMATECH', margin, 16);
@@ -193,14 +293,12 @@ export function TicketButtons({ repair }: { repair: Repair }) {
       if (repair.diagnosis) { y += 2; row('Diagnóstico:', repair.diagnosis); }
       y += 2;
 
-      // Parts
       if (parts.length > 0) {
         section('Piezas utilizadas');
         parts.forEach(p => { row(`${p.quantity}x ${p.item?.name ?? 'Pieza'}`, fmt(p.unitPrice * p.quantity)); });
         y += 2;
       }
 
-      // Products sold
       if (sales.length > 0) {
         section('Productos vendidos');
         sales.forEach(sale => {
@@ -209,7 +307,6 @@ export function TicketButtons({ repair }: { repair: Repair }) {
         y += 2;
       }
 
-      // Cost summary
       section('Resumen de cobro');
       doc.setFillColor(250, 250, 250); doc.rect(margin, y, contentW, 50, 'F');
       doc.setDrawColor(220, 220, 220); doc.rect(margin, y, contentW, 50, 'S');
@@ -235,7 +332,6 @@ export function TicketButtons({ repair }: { repair: Repair }) {
       sumRow(pending > 0 ? 'SALDO PENDIENTE' : '✓ PAGADO', pending > 0 ? fmt(pending) : fmt(total), true);
       y += 8;
 
-      // Signature
       doc.setDrawColor(180, 180, 180);
       doc.line(margin, y + 14, margin + 70, y + 14);
       doc.setFontSize(7.5); doc.setTextColor(100, 100, 100);
@@ -244,7 +340,6 @@ export function TicketButtons({ repair }: { repair: Repair }) {
       doc.line(pageW - margin - 70, y + 14, pageW - margin, y + 14);
       doc.text('Entregado por (técnico)', pageW - margin - 70, y + 19);
 
-      // Footer
       doc.setFillColor(10, 10, 10); doc.rect(0, 285, pageW, 12, 'F');
       doc.setFont('courier', 'bold'); doc.setFontSize(7); doc.setTextColor(251, 191, 36);
       doc.text(repair.ticketNumber, margin, 291);
@@ -257,7 +352,7 @@ export function TicketButtons({ repair }: { repair: Repair }) {
     finally { setLoadingDelivery(false); }
   };
 
-  // ── INTERNAL LABEL (100×70mm + QR) ──────────────────
+  // ── INTERNAL LABEL (100×70mm + QR) ───────────────────────────────────────
   const generateInternalTicket = async () => {
     setLoadingInternal(true);
     try {
