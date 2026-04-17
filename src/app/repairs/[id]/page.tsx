@@ -151,6 +151,7 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
               <TicketButtons repair={{
                 ...repair,
                 createdAt: repair.createdAt.toISOString(),
+                dueDate: repair.dueDate?.toISOString() ?? null,
                 customer: {
                   name: repair.customer.name,
                   phone: repair.customer.phone,
