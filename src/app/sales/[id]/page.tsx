@@ -3,9 +3,10 @@ import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { MobileHeader } from '@/components/MobileHeader';
-import { ArrowLeft, ShoppingBag, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ShoppingBag, ExternalLink, CreditCard, CheckCircle2, Clock } from 'lucide-react';
 import { SaleReceiptButton } from './SaleReceiptButton';
 import { CancelSaleButton } from './CancelSaleButton';
+import { AddPaymentButton } from './AddPaymentButton';
 import { getSession } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -18,13 +19,20 @@ export default async function SaleDetailPage({ params }: { params: { id: string 
   const [sale, session] = await Promise.all([
     prisma.sale.findUnique({
       where: { id: Number(params.id) },
-      include: { customer: true, repair: true, items: { include: { item: true } } },
+      include: { customer: true, repair: true, items: { include: { item: true } }, payments: { orderBy: { createdAt: 'asc' } } },
     }),
     getSession(),
   ]);
 
   if (!sale) notFound();
   const isAdmin = (session?.user as any)?.role === 'ADMIN';
+  const remaining = sale.total - sale.amountPaid;
+  const statusLabel: Record<string, string> = { PAID: 'Liquidado', PARTIAL: 'Anticipo', PENDING: 'Pendiente' };
+  const statusColor: Record<string, string> = {
+    PAID:    'text-green-400 bg-green-400/10 border-green-400/20',
+    PARTIAL: 'text-amber-400 bg-amber-400/10 border-amber-400/20',
+    PENDING: 'text-red-400 bg-red-400/10 border-red-400/20',
+  };
 
   return (
     <div className="min-h-screen">
@@ -75,6 +83,52 @@ export default async function SaleDetailPage({ params }: { params: { id: string 
                 <p className="text-sm text-[#888]">{sale.notes}</p>
               </div>
             )}
+
+            {/* Payment history */}
+            <div className="card p-5">
+              <div className="flex items-center gap-2 pb-3 border-b border-[#1a1a1a] mb-4">
+                <CreditCard size={14} className="text-amber-500" />
+                <h2 className="text-sm font-semibold text-[#ccc]">Historial de pagos</h2>
+              </div>
+              {(sale as any).payments?.length > 0 ? (
+                <div className="space-y-3">
+                  {(sale as any).payments.map((p: any, i: number) => (
+                    <div key={p.id} className="flex items-start gap-3">
+                      <div className="flex flex-col items-center">
+                        <div className="w-6 h-6 rounded-full bg-green-400/10 border border-green-400/20 flex items-center justify-center flex-shrink-0">
+                          <CheckCircle2 size={11} className="text-green-400" />
+                        </div>
+                        {i < (sale as any).payments.length - 1 && (
+                          <div className="w-px flex-1 bg-[#1a1a1a] my-1" style={{ minHeight: 12 }} />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0 pb-1">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <span className="font-mono text-sm text-green-400">{formatCurrency(p.amount)}</span>
+                          <span className="text-[10px] text-[#444] font-mono">
+                            {PAYMENT_LABELS[p.paymentMethod] ?? p.paymentMethod}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[#555] mt-0.5">
+                          {formatDate(p.createdAt)} · {new Date(p.createdAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                        {p.notes && <p className="text-xs text-[#666] mt-0.5 italic">{p.notes}</p>}
+                      </div>
+                    </div>
+                  ))}
+                  {remaining > 0 && (
+                    <div className="flex items-center gap-3 pt-1">
+                      <div className="w-6 h-6 rounded-full bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center flex-shrink-0">
+                        <Clock size={11} className="text-[#555]" />
+                      </div>
+                      <p className="text-xs text-[#555] font-mono">Saldo pendiente: {formatCurrency(remaining)}</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-[#555]">Sin registros de pago.</p>
+              )}
+            </div>
           </div>
 
           {/* Sidebar */}
@@ -86,7 +140,9 @@ export default async function SaleDetailPage({ params }: { params: { id: string 
                 <Row label="Folio" value={sale.saleNumber} mono />
                 <Row label="Fecha" value={formatDate(sale.createdAt)} />
                 <Row label="Hora" value={new Date(sale.createdAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })} mono />
-                <Row label="Método" value={PAYMENT_LABELS[sale.paymentMethod] ?? sale.paymentMethod} />
+                {(sale as any).payments?.[0] && (
+                  <Row label="Método inicial" value={PAYMENT_LABELS[(sale as any).payments[0].paymentMethod] ?? (sale as any).payments[0].paymentMethod} />
+                )}
                 {sale.customer && <Row label="Cliente" value={sale.customer.name} />}
                 {sale.repair && (
                   <div className="flex justify-between items-center">
@@ -111,6 +167,21 @@ export default async function SaleDetailPage({ params }: { params: { id: string 
                     <span className="font-semibold text-[#ddd]">Total</span>
                     <span className="font-mono text-lg font-bold text-amber-400">{formatCurrency(sale.total)}</span>
                   </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-[#888]">Pagado</span>
+                    <span className="font-mono text-sm text-green-400">{formatCurrency(sale.amountPaid)}</span>
+                  </div>
+                  {remaining > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-[#888]">Saldo</span>
+                      <span className="font-mono text-sm text-red-400">{formatCurrency(remaining)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-end pt-1">
+                    <span className={`badge ${statusColor[sale.paymentStatus] ?? statusColor.PENDING}`}>
+                      {statusLabel[sale.paymentStatus] ?? sale.paymentStatus}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -119,11 +190,19 @@ export default async function SaleDetailPage({ params }: { params: { id: string 
             <div className="card p-4 space-y-2">
               <p className="section-title mb-3">Acciones</p>
               <SaleReceiptButton sale={{
-                ...sale,
+                saleNumber: sale.saleNumber,
                 createdAt: sale.createdAt.toISOString(),
+                subtotal: sale.subtotal,
+                discount: sale.discount,
+                total: sale.total,
+                paymentMethod: (sale as any).payments?.[0]?.paymentMethod ?? null,
+                notes: sale.notes,
                 customer: sale.customer ? { name: sale.customer.name, phone: sale.customer.phone } : null,
                 items: sale.items.map(i => ({ name: i.name, quantity: i.quantity, unitPrice: i.unitPrice, subtotal: i.subtotal })),
               }} />
+              {remaining > 0 && (
+                <AddPaymentButton saleId={sale.id} remaining={remaining} />
+              )}
               {isAdmin && <CancelSaleButton saleId={sale.id} saleNumber={sale.saleNumber} />}
             </div>
           </div>

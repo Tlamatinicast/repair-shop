@@ -27,7 +27,7 @@ export default async function RepairsPage({
       } : {}),
     },
     include: { customer: true },
-    orderBy: { createdAt: 'desc' },
+    orderBy: { id: 'desc' },
   });
 
   return (
@@ -72,7 +72,7 @@ export default async function RepairsPage({
             <table className="w-full">
               <thead>
                 <tr className="border-b border-[#1e1e1e]">
-                  {['Ticket', 'Cliente', 'Dispositivo', 'Problema', 'Costo', 'Estado', 'Fecha'].map(h => (
+                  {['Ticket', 'Cliente', 'Dispositivo', 'Problema', 'Costo', 'Estado', 'Pago', 'Fecha'].map(h => (
                     <th key={h} className="text-left px-4 py-3 section-title text-[10px]">{h}</th>
                   ))}
                 </tr>
@@ -100,6 +100,7 @@ export default async function RepairsPage({
                       {r.totalCost > 0 ? formatCurrency(r.totalCost) : <span className="text-[#444]">—</span>}
                     </td>
                     <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
+                    <td className="px-4 py-3"><PaymentBadge status={r.paymentStatus} /></td>
                     <td className="px-4 py-3 text-xs text-[#666] font-mono">{formatDate(r.createdAt)}</td>
                   </tr>
                 ))}
@@ -124,7 +125,10 @@ export default async function RepairsPage({
                   <p className="text-sm font-medium text-[#ddd] mt-0.5">{r.deviceBrand} {r.deviceModel}</p>
                   <p className="text-xs text-[#666]">{r.deviceType}</p>
                 </div>
-                <StatusBadge status={r.status} />
+                <div className="flex flex-col items-end gap-1">
+                  <StatusBadge status={r.status} />
+                  <PaymentBadge status={r.paymentStatus} />
+                </div>
               </div>
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#1a1a1a]">
                 <div>
@@ -145,6 +149,16 @@ export default async function RepairsPage({
       </div>
     </div>
   );
+}
+
+function PaymentBadge({ status }: { status: string }) {
+  const map: Record<string, { label: string; cls: string }> = {
+    PAID:    { label: 'Liquidado', cls: 'text-green-400 bg-green-400/10 border-green-400/20' },
+    PARTIAL: { label: 'Anticipo',  cls: 'text-amber-400 bg-amber-400/10 border-amber-400/20' },
+    PENDING: { label: 'Pendiente', cls: 'text-red-400 bg-red-400/10 border-red-400/20' },
+  };
+  const { label, cls } = map[status] ?? map.PENDING;
+  return <span className={`badge ${cls}`}>{label}</span>;
 }
 
 function FilterLink({ href, active, label }: { href: string; active: boolean; label: string }) {

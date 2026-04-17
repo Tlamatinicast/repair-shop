@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma';
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   const sale = await prisma.sale.findUnique({
     where: { id: Number(params.id) },
-    include: { customer: true, items: { include: { item: true } } },
+    include: { customer: true, items: { include: { item: true } }, payments: { orderBy: { createdAt: 'asc' } } },
   });
   if (!sale) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
   return NextResponse.json(sale);

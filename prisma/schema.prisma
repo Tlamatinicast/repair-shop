@@ -100,20 +100,32 @@ model RepairNote {
 }
 
 model Sale {
-  id            Int        @id @default(autoincrement())
-  saleNumber    String     @unique
-  customer      Customer?  @relation(fields: [customerId], references: [id])
+  id            Int            @id @default(autoincrement())
+  saleNumber    String         @unique
+  customer      Customer?      @relation(fields: [customerId], references: [id])
   customerId    Int?
-  repair        Repair?    @relation(fields: [repairId], references: [id])
+  repair        Repair?        @relation(fields: [repairId], references: [id])
   repairId      Int?
   items         SaleItem[]
-  subtotal      Float      @default(0)
-  discount      Float      @default(0)
-  total         Float      @default(0)
-  paymentMethod String     @default("CASH")
+  payments      SalePayment[]
+  subtotal      Float          @default(0)
+  discount      Float          @default(0)
+  total         Float          @default(0)
+  amountPaid    Float          @default(0)
+  paymentStatus String         @default("PENDING")
   notes         String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model SalePayment {
+  id            Int      @id @default(autoincrement())
+  sale          Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  saleId        Int
+  amount        Float
+  paymentMethod String   @default("CASH")
+  notes         String?
+  createdAt     DateTime @default(now())
 }
 
 model SaleItem {

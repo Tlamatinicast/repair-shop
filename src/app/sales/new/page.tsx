@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Plus, Minus, Trash2, ShoppingCart, User, ChevronDown, Loader2, Tag } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, ShoppingCart, User, Loader2, Tag, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/utils';
 
@@ -49,7 +49,6 @@ export default function NewSalePage() {
   // Cart
   const [cart, setCart]           = useState<CartItem[]>([]);
   const [discount, setDiscount]   = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState<keyof typeof PAYMENT_METHODS>('CASH');
   const [notes, setNotes]         = useState('');
 
   // Customer
@@ -57,12 +56,23 @@ export default function NewSalePage() {
   const [customerSearch, setCustomerSearch] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showCustomers, setShowCustomers] = useState(false);
+  const [customerTab, setCustomerTab] = useState<'search' | 'new'>('search');
+  const [newCustomerName, setNewCustomerName] = useState('');
+  const [newCustomerPhone, setNewCustomerPhone] = useState('');
+  const [newCustomerEmail, setNewCustomerEmail] = useState('');
+  const [creatingCustomer, setCreatingCustomer] = useState(false);
+  const [customerError, setCustomerError] = useState('');
 
   // Repair link
   const [repairSearch, setRepairSearch]       = useState('');
   const [repairs, setRepairs]                 = useState<any[]>([]);
   const [selectedRepair, setSelectedRepair]   = useState<any | null>(null);
   const [showRepairs, setShowRepairs]         = useState(false);
+
+  // Payment
+  const [paymentType, setPaymentType] = useState<'FULL' | 'PARTIAL'>('FULL');
+  const [paymentMethod, setPaymentMethod] = useState<keyof typeof PAYMENT_METHODS>('CASH');
+  const [advanceAmount, setAdvanceAmount] = useState('');
 
   // Submit
   const [submitting, setSubmitting] = useState(false);
@@ -136,6 +146,11 @@ export default function NewSalePage() {
 
   const handleSubmit = async () => {
     if (cart.length === 0) { setError('Agrega al menos un producto.'); return; }
+    const initialPayment = paymentType === 'FULL' ? total : parseFloat(advanceAmount);
+    if (!initialPayment || initialPayment <= 0) {
+      setError('Ingresa el monto del anticipo.');
+      return;
+    }
     setSubmitting(true);
     setError('');
     try {
@@ -143,12 +158,13 @@ export default function NewSalePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          customerId: selectedCustomer?.id ?? (selectedRepair?.customerId ?? null),
-          repairId:   selectedRepair?.id ?? null,
-          items: cart.map(i => ({ itemId: i.itemId, name: i.name, quantity: i.quantity, unitPrice: i.unitPrice })),
+          customerId:     selectedCustomer?.id ?? (selectedRepair?.customerId ?? null),
+          repairId:       selectedRepair?.id ?? null,
+          items:          cart.map(i => ({ itemId: i.itemId, name: i.name, quantity: i.quantity, unitPrice: i.unitPrice })),
           discount,
           paymentMethod,
           notes,
+          initialPayment,
         }),
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
@@ -158,6 +174,34 @@ export default function NewSalePage() {
     } catch (err: any) {
       setError(err.message);
       setSubmitting(false);
+    }
+  };
+
+  const handleCreateCustomer = async () => {
+    if (!newCustomerName.trim() || !newCustomerPhone.trim()) {
+      setCustomerError('Nombre y teléfono son requeridos.');
+      return;
+    }
+    setCreatingCustomer(true);
+    setCustomerError('');
+    try {
+      const res = await fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newCustomerName.trim(), phone: newCustomerPhone.trim(), email: newCustomerEmail.trim() || undefined }),
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+      const created = await res.json();
+      setSelectedCustomer({ id: created.id, name: created.name, phone: created.phone });
+      setCustomers(prev => [...prev, { id: created.id, name: created.name, phone: created.phone }]);
+      setNewCustomerName('');
+      setNewCustomerPhone('');
+      setNewCustomerEmail('');
+      setCustomerTab('search');
+    } catch (err: any) {
+      setCustomerError(err.message);
+    } finally {
+      setCreatingCustomer(false);
     }
   };
 
@@ -320,6 +364,7 @@ export default function NewSalePage() {
           {/* Customer (optional) */}
           <div className="card p-4">
             <p className="section-title mb-3">Cliente (opcional)</p>
+
             {selectedCustomer ? (
               <div className="flex items-center gap-3 p-3 bg-[#0f0f0f] rounded-lg border border-[#1e1e1e]">
                 <div className="w-8 h-8 bg-amber-500/20 border border-amber-500/20 rounded-lg flex items-center justify-center text-amber-500 font-bold text-sm flex-shrink-0">
@@ -334,42 +379,135 @@ export default function NewSalePage() {
                 </button>
               </div>
             ) : (
-              <div className="relative">
-                <User size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#555]" />
-                <input
-                  value={customerSearch}
-                  onChange={e => { setCustomerSearch(e.target.value); setShowCustomers(true); }}
-                  onFocus={() => setShowCustomers(true)}
-                  onBlur={() => setTimeout(() => setShowCustomers(false), 150)}
-                  placeholder="Buscar cliente..."
-                  className="input pl-9"
-                />
-                {showCustomers && filteredCustomers.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-[#111] border border-[#222] rounded-xl overflow-hidden z-30 shadow-xl">
-                    {filteredCustomers.map(c => (
-                      <button
-                        key={c.id}
-                        onMouseDown={() => { setSelectedCustomer(c); setCustomerSearch(''); setShowCustomers(false); }}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[#1a1a1a] text-left"
-                      >
-                        <div className="w-6 h-6 bg-amber-500/20 rounded-md flex items-center justify-center text-amber-500 text-xs font-bold flex-shrink-0">
-                          {c.name.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="text-sm text-[#ddd]">{c.name}</p>
-                          <p className="text-xs text-[#555] font-mono">{c.phone}</p>
-                        </div>
-                      </button>
-                    ))}
+              <>
+                {/* Tabs */}
+                <div className="flex gap-1 mb-3 bg-[#0a0a0a] rounded-lg p-1">
+                  <button
+                    onClick={() => { setCustomerTab('search'); setCustomerError(''); }}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-all ${customerTab === 'search' ? 'bg-[#1a1a1a] text-amber-400' : 'text-[#555] hover:text-[#888]'}`}
+                  >
+                    <User size={11} /> Buscar
+                  </button>
+                  <button
+                    onClick={() => { setCustomerTab('new'); setCustomerError(''); }}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-all ${customerTab === 'new' ? 'bg-[#1a1a1a] text-amber-400' : 'text-[#555] hover:text-[#888]'}`}
+                  >
+                    <UserPlus size={11} /> Nuevo
+                  </button>
+                </div>
+
+                {customerTab === 'search' ? (
+                  <div className="relative">
+                    <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#555]" />
+                    <input
+                      value={customerSearch}
+                      onChange={e => { setCustomerSearch(e.target.value); setShowCustomers(true); }}
+                      onFocus={() => setShowCustomers(true)}
+                      onBlur={() => setTimeout(() => setShowCustomers(false), 150)}
+                      placeholder="Buscar por nombre o teléfono..."
+                      className="input pl-9"
+                    />
+                    {showCustomers && filteredCustomers.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-[#111] border border-[#222] rounded-xl overflow-hidden z-30 shadow-xl">
+                        {filteredCustomers.map(c => (
+                          <button
+                            key={c.id}
+                            onMouseDown={() => { setSelectedCustomer(c); setCustomerSearch(''); setShowCustomers(false); }}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[#1a1a1a] text-left"
+                          >
+                            <div className="w-6 h-6 bg-amber-500/20 rounded-md flex items-center justify-center text-amber-500 text-xs font-bold flex-shrink-0">
+                              {c.name.charAt(0)}
+                            </div>
+                            <div>
+                              <p className="text-sm text-[#ddd]">{c.name}</p>
+                              <p className="text-xs text-[#555] font-mono">{c.phone}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <input
+                      value={newCustomerName}
+                      onChange={e => setNewCustomerName(e.target.value)}
+                      placeholder="Nombre completo *"
+                      className="input"
+                    />
+                    <input
+                      value={newCustomerPhone}
+                      onChange={e => setNewCustomerPhone(e.target.value)}
+                      placeholder="Teléfono *"
+                      className="input"
+                      type="tel"
+                    />
+                    <input
+                      value={newCustomerEmail}
+                      onChange={e => setNewCustomerEmail(e.target.value)}
+                      placeholder="Correo electrónico (opcional)"
+                      className="input"
+                      type="email"
+                    />
+                    {customerError && (
+                      <p className="text-xs text-red-400">{customerError}</p>
+                    )}
+                    <button
+                      onClick={handleCreateCustomer}
+                      disabled={creatingCustomer}
+                      className="btn-primary w-full justify-center py-2 text-sm disabled:opacity-40"
+                    >
+                      {creatingCustomer
+                        ? <><Loader2 size={13} className="animate-spin" /> Guardando...</>
+                        : <><UserPlus size={13} /> Crear y seleccionar</>
+                      }
+                    </button>
                   </div>
                 )}
-              </div>
+              </>
             )}
           </div>
 
           {/* Payment */}
           <div className="card p-4 space-y-3">
             <p className="section-title mb-1">Pago</p>
+
+            {/* Toggle pago total / anticipo */}
+            <div className="flex gap-1 bg-[#0a0a0a] rounded-lg p-1">
+              <button
+                onClick={() => setPaymentType('FULL')}
+                className={`flex-1 py-1.5 rounded-md text-xs font-medium transition-all ${paymentType === 'FULL' ? 'bg-[#1a1a1a] text-amber-400' : 'text-[#555] hover:text-[#888]'}`}
+              >
+                Pago total
+              </button>
+              <button
+                onClick={() => setPaymentType('PARTIAL')}
+                className={`flex-1 py-1.5 rounded-md text-xs font-medium transition-all ${paymentType === 'PARTIAL' ? 'bg-[#1a1a1a] text-amber-400' : 'text-[#555] hover:text-[#888]'}`}
+              >
+                Anticipo
+              </button>
+            </div>
+
+            {paymentType === 'PARTIAL' && (
+              <div>
+                <label className="label">Monto del anticipo (MXN)</label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={advanceAmount}
+                  onChange={e => setAdvanceAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="input"
+                />
+                {total > 0 && parseFloat(advanceAmount) > 0 && (
+                  <p className="text-xs text-[#555] mt-1 font-mono">
+                    Saldo restante: {formatCurrency(Math.max(0, total - (parseFloat(advanceAmount) || 0)))}
+                  </p>
+                )}
+              </div>
+            )}
+
             <div>
               <label className="label">Método de pago</label>
               <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as any)} className="select">

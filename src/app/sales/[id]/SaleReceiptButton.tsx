@@ -14,7 +14,7 @@ interface SaleData {
   subtotal: number;
   discount: number;
   total: number;
-  paymentMethod: string;
+  paymentMethod?: string | null;
   notes?: string | null;
   customer?: { name: string; phone: string } | null;
   items: { name: string; quantity: number; unitPrice: number; subtotal: number }[];

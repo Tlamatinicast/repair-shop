@@ -23,7 +23,7 @@ export default async function SalesPage({ searchParams }: { searchParams: { date
   const [sales, stats, byMethod] = await Promise.all([
     prisma.sale.findMany({
       where: { createdAt: { gte: start, lte: end } },
-      include: { customer: true, items: true },
+      include: { customer: true, items: true, payments: { orderBy: { createdAt: 'asc' }, take: 1 } },
       orderBy: { createdAt: 'desc' },
     }),
     prisma.sale.aggregate({
@@ -31,9 +31,9 @@ export default async function SalesPage({ searchParams }: { searchParams: { date
       _count: true,
       where: { createdAt: { gte: start, lte: end } },
     }),
-    prisma.sale.groupBy({
+    prisma.salePayment.groupBy({
       by: ['paymentMethod'],
-      _sum: { total: true },
+      _sum: { amount: true },
       _count: true,
       where: { createdAt: { gte: start, lte: end } },
     }),
@@ -71,7 +71,7 @@ export default async function SalesPage({ searchParams }: { searchParams: { date
                 {PAYMENT_LABELS[m.paymentMethod]?.icon}
                 <span className="section-title text-current opacity-70 text-[9px]">{PAYMENT_LABELS[m.paymentMethod]?.label ?? m.paymentMethod}</span>
               </div>
-              <p className="font-mono text-sm font-semibold text-violet-400">{formatCurrency(m._sum.total ?? 0)}</p>
+              <p className="font-mono text-sm font-semibold text-violet-400">{formatCurrency(m._sum.amount ?? 0)}</p>
             </div>
           ))}
         </div>
@@ -97,7 +97,7 @@ export default async function SalesPage({ searchParams }: { searchParams: { date
                   <td className="px-4 py-3 text-sm text-[#888]">{s.items.length} producto{s.items.length !== 1 ? 's' : ''}</td>
                   <td className="px-4 py-3">
                     <span className="badge text-violet-400 bg-violet-400/10 border-violet-400/20">
-                      {PAYMENT_LABELS[s.paymentMethod]?.label ?? s.paymentMethod}
+                      {PAYMENT_LABELS[(s as any).payments?.[0]?.paymentMethod]?.label ?? 'N/A'}
                     </span>
                   </td>
                   <td className="px-4 py-3 font-mono text-sm text-amber-400 font-medium">{formatCurrency(s.total)}</td>
@@ -120,7 +120,7 @@ export default async function SalesPage({ searchParams }: { searchParams: { date
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-mono text-xs text-amber-500">{s.saleNumber}</span>
                     <span className="badge text-violet-400 bg-violet-400/10 border-violet-400/20 text-[9px]">
-                      {PAYMENT_LABELS[s.paymentMethod]?.label}
+                      {PAYMENT_LABELS[(s as any).payments?.[0]?.paymentMethod]?.label ?? 'N/A'}
                     </span>
                   </div>
                   <p className="text-sm text-[#ccc]">{s.customer?.name ?? 'Sin cliente'}</p>

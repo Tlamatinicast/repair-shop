@@ -27,10 +27,15 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { customerId, repairId, items, discount, paymentMethod, notes } = body;
+    const { customerId, repairId, items, discount, paymentMethod, notes, initialPayment } = body;
 
     if (!items || items.length === 0) {
       return NextResponse.json({ error: 'La venta debe tener al menos un producto' }, { status: 400 });
+    }
+
+    const initialAmt = parseFloat(initialPayment) || 0;
+    if (initialAmt <= 0) {
+      return NextResponse.json({ error: 'Se requiere al menos un pago inicial' }, { status: 400 });
     }
 
     // Validate stock
@@ -45,6 +50,8 @@ export async function POST(req: NextRequest) {
     const subtotal    = items.reduce((s: number, i: any) => s + i.unitPrice * i.quantity, 0);
     const discountAmt = parseFloat(discount) || 0;
     const total       = subtotal - discountAmt;
+    const amountPaid  = Math.min(initialAmt, total);
+    const paymentStatus = amountPaid >= total ? 'PAID' : 'PARTIAL';
 
     const count      = await prisma.sale.count();
     const saleNumber = `VT-${String(count + 1).padStart(4, '0')}`;
@@ -58,7 +65,8 @@ export async function POST(req: NextRequest) {
           subtotal,
           discount:      discountAmt,
           total,
-          paymentMethod: paymentMethod || 'CASH',
+          amountPaid,
+          paymentStatus,
           notes:         notes || null,
           items: {
             create: items.map((i: any) => ({
@@ -69,8 +77,14 @@ export async function POST(req: NextRequest) {
               subtotal:  i.unitPrice * i.quantity,
             })),
           },
+          payments: {
+            create: {
+              amount:        amountPaid,
+              paymentMethod: paymentMethod || 'CASH',
+            },
+          },
         },
-        include: { customer: true, repair: true, items: { include: { item: true } } },
+        include: { customer: true, repair: true, items: { include: { item: true } }, payments: true },
       });
 
       // Discount stock
@@ -81,7 +95,7 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // If linked to repair, recalculate totalCost from all parts + all sales (including this new one)
+      // If linked to repair, recalculate totalCost
       if (repairId) {
         const repairWithTotals = await tx.repair.findUnique({
           where: { id: Number(repairId) },
