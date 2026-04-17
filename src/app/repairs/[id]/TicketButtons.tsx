@@ -127,7 +127,7 @@ export function TicketButtons({ repair }: { repair: Repair }) {
       doc.text('Conserve este comprobante para reclamar su equipo.', pageW / 2, 291, { align: 'center' });
       doc.text(`Generado: ${new Date().toLocaleString('es-MX')}`, pageW - margin, 291, { align: 'right' });
 
-      doc.save(`ticket-entrada-${repair.ticketNumber}.pdf`);
+      window.open(doc.output('bloburl'), '_blank');
     } catch (err) { console.error(err); alert('Error al generar el PDF.'); }
     finally { setLoadingClient(false); }
   };
@@ -252,7 +252,7 @@ export function TicketButtons({ repair }: { repair: Repair }) {
       doc.text('Gracias por su preferencia — TLAMATECH', pageW / 2, 291, { align: 'center' });
       doc.text(`${new Date().toLocaleString('es-MX')}`, pageW - margin, 291, { align: 'right' });
 
-      doc.save(`ticket-entrega-${repair.ticketNumber}.pdf`);
+      window.open(doc.output('bloburl'), '_blank');
     } catch (err) { console.error(err); alert('Error al generar el ticket de entrega.'); }
     finally { setLoadingDelivery(false); }
   };
@@ -291,7 +291,7 @@ export function TicketButtons({ repair }: { repair: Repair }) {
       doc.setDrawColor(251, 191, 36); doc.setLineWidth(0.8);
       doc.rect(0.4, 0.4, 99.2, 69.2);
 
-      doc.save(`etiqueta-${repair.ticketNumber}.pdf`);
+      window.open(doc.output('bloburl'), '_blank');
     } catch (err) { console.error(err); alert('Error al generar la etiqueta.'); }
     finally { setLoadingInternal(false); }
   };
