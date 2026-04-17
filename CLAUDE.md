@@ -3,7 +3,7 @@
 > Este archivo se carga automáticamente al iniciar Claude Code en este repositorio.
 > Mantenerlo actualizado para que cualquier nueva sesión arranque ya informada.
 >
-> Última actualización: 2026-04-16
+> Última actualización: 2026-04-17
 
 ---
 
@@ -32,12 +32,15 @@
 
 | Capa | Tecnología |
 |---|---|
-| Frontend | Next.js 14 (App Router) + TypeScript + Tailwind CSS |
+| Frontend | Next.js 14.2.35 (App Router) + TypeScript + Tailwind CSS |
 | Backend | Next.js API Routes (REST) |
-| DB | SQLite vía **Prisma 5** (Prisma 7 rompe el schema actual) |
+| DB local | SQLite vía **Prisma 5** (dev solamente) |
+| DB producción | **PostgreSQL** en Railway vía Prisma 5 |
 | Auth | NextAuth.js + bcryptjs |
 | PWA | next-pwa |
+| Fotos | **Cloudinary** (cloud_name: dpd8cifms) |
 | Extras | jspdf, qrcode, sharp |
+| Hosting | **Railway** — https://repair-shop-production-c450.up.railway.app |
 
 Dos roles: **Admin** y **Technician**. Flujo de estados de reparación:
 `RECEIVED → DIAGNOSING → WAITING_PARTS → IN_REPAIR → READY → DELIVERED (o CANCELLED)`.
@@ -50,18 +53,19 @@ Estados de pago (`paymentStatus`): `PENDING → PARTIAL → PAID` (aplica tanto 
 prisma/
   schema.prisma           # Modelos (Customer, Repair, InventoryItem, RepairPart,
                           #          RepairPhoto, RepairNote, Sale, SaleItem,
-                          #          SalePayment, User)
+                          #          SalePayment, RepairStatusLog, User)
+  migrations/             # Migraciones PostgreSQL (generadas con prisma migrate dev)
   seed.ts, seed.users.ts
-  dev.db                  # SQLite local
+  dev.db                  # SQLite local (NO se sube a git)
 src/
   app/
-    api/                  # REST endpoints
+    api/                  # REST endpoints — todos requieren sesión (apiRequireAuth)
       repairs/[id]/       # route.ts, notes/, parts/, payment/, photos/
       sales/              # route.ts, [id]/(route.ts, payments/), stats/
       customers/, inventory/, stats/, users/, auth/[...nextauth]/
     repairs/, customers/, inventory/, sales/, reports/, settings/, login/
   components/             # Sidebar, BottomNav, MobileHeader, ui/
-  lib/                    # prisma.ts, auth.ts, utils.ts
+  lib/                    # prisma.ts, auth.ts, authOptions.ts, cloudinary.ts, utils.ts
   types/
 ```
 
@@ -88,7 +92,11 @@ src/
   - Badge de estado de pago en detalle de venta
 - **Ventas ligadas a reparaciones** — se incluyen en el totalCost de la orden
 - **Piezas reservadas** — se apartan del inventario sin descontar hasta confirmar uso
-- **Crear cliente desde nueva venta** — tab "Buscar / Nuevo" en sección Cliente del POS
+- **Crear cliente desde nueva venta o nueva orden** — tabs "Buscar / Nuevo" en sección Cliente
+- **Tiempos de servicio** — `queueDate` obligatoria, `dueDate` opcional (servicios definidos), `partsEta` en WAITING_PARTS
+- **RepairStatusLog** — registra automáticamente duración por etapa al cambiar estado
+- **Seguridad** — todos los endpoints requieren sesión; DELETE requiere Admin
+- **En producción** en Railway con PostgreSQL + Cloudinary para fotos
 
 ---
 
@@ -109,30 +117,30 @@ src/
 9. **Transacciones en Prisma:** las mutaciones que tocan stock (agregar pieza, confirmar reserva, borrar pieza, crear venta, cancelar venta) están envueltas en `prisma.$transaction(...)` para mantener consistencia entre `RepairPart`, `InventoryItem.quantity`, `InventoryItem.reservedQty` y `Repair.totalCost`.
 10. **`paymentMethod` vive en `SalePayment`, NO en `Sale`** — al migrar se eliminó el campo directo. Para mostrar método en listas usar `payments[0].paymentMethod`. El `groupBy` de stats debe hacerse sobre `prisma.salePayment`, no `prisma.sale`.
 11. **Reiniciar dev server tras `db push`** en Windows — el cliente Prisma regenerado no puede sobrescribir el `.dll` bloqueado por el proceso activo. Ctrl+C + `npm run dev` resuelve el `EPERM`.
-12. **Orden de listas:** usar `orderBy: { id: 'desc' }` en lugar de `createdAt` cuando hay datos de seed (mismos timestamps causan orden inconsistente).
+12. **Orden de listas:** `orderBy: { createdAt: 'desc' }` es correcto — los datos del seed tienen timestamps distintos. El `id` no siempre coincide con el orden de creación.
+13. **`authOptions` NO puede exportarse desde `route.ts`** — vive en `src/lib/authOptions.ts` e importarse desde ahí. Exportarlo desde el route causa error de build en producción.
+14. **Dev local usa SQLite, producción usa PostgreSQL** — no mezclar. Para crear migraciones de producción: cambiar `DATABASE_URL` en `.env` a la URL pública de Railway, correr `prisma migrate dev`, luego revertir `.env`.
+15. **Fotos:** se suben a Cloudinary (cloud: dpd8cifms). Las credenciales están en `.env` y en Railway Variables. NO usar filesystem local en producción — Railway no tiene almacenamiento persistente.
+16. **Script de start en producción:** `prisma migrate deploy && next start` — aplica migraciones pendientes automáticamente en cada deploy.
 
 ---
 
-## Estado actual al 2026-04-16
+## Estado actual al 2026-04-17
 
-**Último commit en `main`:** `e760a53 Eliminar componentes duplicados en repairs/[id]`
+**Último commit en `main`:** `67e72a3 Integrar Cloudinary para almacenamiento persistente de fotos`
 
-Todo el trabajo de la sesión está **pendiente de commitear**:
-- Pagos parciales / anticipo en ventas (`SalePayment`, `amountPaid`, `paymentStatus`)
-- Crear cliente desde nueva venta (tabs Buscar / Nuevo)
-- Badge de estado de pago en lista de órdenes
-- Orden de lista de órdenes por `id desc`
-- Fix badge de roles en `/settings` (mobile)
-- Schema sincronizado con `db push`
+**En producción:** https://repair-shop-production-c450.up.railway.app  
+**Credenciales demo:** admin@repaiross.com / admin123 · tecnico@repaiross.com / tecnico123
 
 ### Schema actual (modelos clave)
 
-- `Repair`: `advancePayment`, `paymentStatus` (PENDING/PARTIAL/PAID), relación `sales`
+- `Repair`: `advancePayment`, `paymentStatus`, `queueDate`, `dueDate`, `partsEta`, `isDefinedService`, relaciones `sales`, `statusLogs`
+- `RepairStatusLog`: registro automático de duración por etapa de estado
 - `Sale`: `amountPaid`, `paymentStatus` (PENDING/PARTIAL/PAID), relación `payments: SalePayment[]`
 - `SalePayment`: `saleId`, `amount`, `paymentMethod`, `notes`, `createdAt`
 - `InventoryItem`: `reservedQty`, relación `saleItems`
 - `RepairPart`: `reserved: Boolean`
-- `RepairNote`: `photoUrls: String?` (JSON array; `photoUrl` legacy)
+- `RepairNote`: `photoUrls: String?` (JSON array con URLs de Cloudinary; `photoUrl` legacy)
 
 ---
 
