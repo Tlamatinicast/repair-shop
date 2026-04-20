@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
 import { prisma } from '@/lib/prisma';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   const settings = await prisma.setting.findMany();
   const result = Object.fromEntries(settings.map(s => [s.key, s.value]));
