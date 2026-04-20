@@ -6,6 +6,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { MobileHeader } from '@/components/MobileHeader';
 import { ArrowLeft, User, Smartphone, Clock } from 'lucide-react';
 import { UpdateStatusForm } from './UpdateStatusForm';
+import { WhatsAppButton } from './WhatsAppButton';
 import { TicketButtons } from './TicketButtons';
 import { RepairTimeline } from './RepairTimeline';
 import { RepairWorkspace } from './RepairWorkspace';
@@ -14,7 +15,7 @@ import { getSession } from '@/lib/auth';
 export const dynamic = 'force-dynamic';
 
 export default async function RepairDetailPage({ params }: { params: { id: string } }) {
-  const [repair, session] = await Promise.all([
+  const [repair, session, businessNameSetting] = await Promise.all([
     prisma.repair.findUnique({
       where: { id: Number(params.id) },
       include: {
@@ -26,7 +27,9 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
       },
     }),
     getSession(),
+    prisma.setting.findUnique({ where: { key: 'businessName' } }),
   ]);
+  const businessName = businessNameSetting?.value ?? 'TLAMATECH';
 
   if (!repair) notFound();
 
@@ -170,6 +173,16 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                 paymentStatus={repair.paymentStatus}
                 partsEta={(repair as any).partsEta?.toISOString() ?? null}
               />
+              <div className="mt-3">
+                <WhatsAppButton
+                  phone={repair.customer.phone}
+                  status={repair.status}
+                  customerName={repair.customer.name}
+                  deviceBrand={repair.deviceBrand}
+                  deviceModel={repair.deviceModel}
+                  businessName={businessName}
+                />
+              </div>
             </div>
 
             {/* Tiempos */}

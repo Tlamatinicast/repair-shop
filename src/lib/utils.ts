@@ -37,3 +37,30 @@ export function formatDate(date: string | Date): string {
 export function generateTicketNumber(id: number): string {
   return `TK-${String(id).padStart(4, '0')}`;
 }
+
+const WA_MESSAGES: Record<string, (name: string, device: string, biz: string) => string> = {
+  RECEIVED:      (n, d, b) => `Hola ${n}, te confirmamos que recibimos tu ${d} para revisión. Te avisaremos cuando tengamos un diagnóstico. — ${b}`,
+  DIAGNOSING:    (n, d, b) => `Hola ${n}, tu ${d} está en diagnóstico. En breve te compartimos los detalles y costo estimado. — ${b}`,
+  WAITING_PARTS: (n, d, b) => `Hola ${n}, ya tenemos el diagnóstico de tu ${d}. Estamos en espera de las piezas necesarias. Te avisamos en cuanto lleguen. — ${b}`,
+  IN_REPAIR:     (n, d, b) => `Hola ${n}, tu ${d} ya está en proceso de reparación. Te notificamos cuando esté lista. — ${b}`,
+  READY:         (n, d, b) => `Hola ${n}, ¡tu ${d} está lista! Puedes pasar a recogerla a nuestro taller en el horario de atención. — ${b}`,
+  DELIVERED:     (n, d, b) => `Hola ${n}, gracias por confiar en ${b}. Esperamos que tu ${d} funcione de maravilla. ¡Hasta pronto! 🙌`,
+  CANCELLED:     (n, d, b) => `Hola ${n}, lamentamos informarte que la orden de tu ${d} fue cancelada. Contáctanos si tienes dudas. — ${b}`,
+};
+
+export function buildWhatsAppUrl(
+  phone: string,
+  status: string,
+  customerName: string,
+  deviceBrand: string,
+  deviceModel: string,
+  businessName: string,
+): string {
+  const device = `${deviceBrand} ${deviceModel}`;
+  const firstName = customerName.split(' ')[0];
+  const msgFn = WA_MESSAGES[status] ?? WA_MESSAGES['RECEIVED'];
+  const text = msgFn(firstName, device, businessName);
+  const cleanPhone = phone.replace(/\D/g, '');
+  const fullPhone = cleanPhone.startsWith('52') ? cleanPhone : `52${cleanPhone}`;
+  return `https://wa.me/${fullPhone}?text=${encodeURIComponent(text)}`;
+}
