@@ -18,7 +18,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (error) return error;
   try {
     const body = await req.json();
-    const { status, deviceType, deviceBrand, deviceModel, serialNumber, password, issue, diagnosis, notes, laborCost, totalCost, partsEta } = body;
+    const { status, deviceType, deviceBrand, deviceModel, serialNumber, password, issue, diagnosis, notes, laborCost, totalCost, partsEta, warrantyType, warrantyVoided, warrantyVoidReason } = body;
     const data: Record<string, any> = {};
 
     const existingRepair = await prisma.repair.findUnique({ where: { id: Number(params.id) } });
@@ -39,7 +39,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (notes        !== undefined) data.notes        = notes || null;
     if (laborCost    !== undefined) data.laborCost    = parseFloat(laborCost);
     if (totalCost    !== undefined) data.totalCost    = parseFloat(totalCost);
-    if (partsEta     !== undefined) data.partsEta     = partsEta ? new Date(partsEta) : null;
+    if (partsEta          !== undefined) data.partsEta          = partsEta ? new Date(partsEta) : null;
+    if (warrantyType      !== undefined) data.warrantyType      = warrantyType;
+    if (warrantyVoided    !== undefined) data.warrantyVoided    = warrantyVoided;
+    if (warrantyVoidReason !== undefined) data.warrantyVoidReason = warrantyVoidReason ?? null;
 
     // If status changed, close current log and open new one
     const statusChanged = status !== undefined && status !== existingRepair.status;

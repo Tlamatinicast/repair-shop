@@ -57,6 +57,9 @@ model Repair {
   serviceType         String    @default("DIAGNOSIS")
   authorizedDiagnosis Boolean   @default(false)
   clientSignature     String    @default("") @db.Text
+  warrantyType        String    @default("NONE")
+  warrantyVoided      Boolean   @default(false)
+  warrantyVoidReason  String?
 }
 
 model RepairStatusLog {

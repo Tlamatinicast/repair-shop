@@ -8,6 +8,7 @@ import { ArrowLeft, User, Smartphone, Clock } from 'lucide-react';
 import { UpdateStatusForm } from './UpdateStatusForm';
 import { WhatsAppButton } from './WhatsAppButton';
 import { TicketButtons } from './TicketButtons';
+import { WarrantyCard } from './WarrantyCard';
 import { RepairTimeline } from './RepairTimeline';
 import { RepairWorkspace } from './RepairWorkspace';
 import { getSession } from '@/lib/auth';
@@ -149,6 +150,17 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
               initialPaymentStatus={repair.paymentStatus}
             />
 
+            {/* Garantía */}
+            <WarrantyCard
+              repairId={repair.id}
+              repairStatus={repair.status}
+              warrantyType={(repair as any).warrantyType ?? 'NONE'}
+              warrantyVoided={(repair as any).warrantyVoided ?? false}
+              deliveredAt={repair.deliveredAt?.toISOString() ?? null}
+              userRole={(session?.user as any)?.role ?? 'TECHNICIAN'}
+              authorName={(session?.user as any)?.name ?? 'Usuario'}
+            />
+
             {/* Tickets */}
             <div className="card p-5">
               <p className="section-title mb-4">Imprimir tickets</p>
@@ -158,6 +170,9 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                   ...repair,
                   createdAt: repair.createdAt.toISOString(),
                   dueDate: repair.dueDate?.toISOString() ?? null,
+                  deliveredAt: repair.deliveredAt?.toISOString() ?? null,
+                  warrantyType: (repair as any).warrantyType ?? 'NONE',
+                  warrantyVoided: (repair as any).warrantyVoided ?? false,
                   customer: {
                     name: repair.customer.name,
                     phone: repair.customer.phone,

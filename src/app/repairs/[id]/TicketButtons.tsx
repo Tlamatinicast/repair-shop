@@ -20,6 +20,9 @@ interface Repair {
   status: string;
   createdAt: string;
   dueDate?: string | null;
+  deliveredAt?: string | null;
+  warrantyType?: string;
+  warrantyVoided?: boolean;
   password?: string | null;
   contactPreference?: string;
   accessories?: string;
@@ -300,7 +303,6 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
         'Tiempo estimado: 3–7 días hábiles, sujeto a disponibilidad de piezas.',
         `${biz.name} no se responsabiliza por pérdida de datos. Respalde su información.`,
         'Equipos no reclamados después de 30 días generarán cargo por almacenaje.',
-        'Garantía: 30 días en mano de obra y 90 días en piezas instaladas.',
       ].forEach((term, i) => {
         const tlines = doc.splitTextToSize(`${i + 1}. ${term}`, contentW - 4);
         doc.text(tlines, margin, y);
@@ -444,6 +446,34 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       doc.setDrawColor(200, 200, 200); doc.line(margin + 4, y + 2, pageW - margin - 4, y + 2); y += 4;
       sumRow(pending > 0 ? 'SALDO PENDIENTE' : '✓ PAGADO', pending > 0 ? fmt(pending) : fmt(total), true);
       y += 8;
+
+      // ── Garantía ───────────────────────────────────────────────────────────
+      const wType = repair.warrantyType ?? 'NONE';
+      const wVoided = repair.warrantyVoided ?? false;
+      if (wType !== 'NONE') {
+        y += 4;
+        doc.setFillColor(245, 245, 245); doc.rect(margin, y, contentW, 7, 'F');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(80, 80, 80);
+        doc.text('GARANTÍA', margin + 3, y + 5); y += 11;
+
+        if (wVoided) {
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(180, 50, 50);
+          doc.text('Garantía anulada — equipo alterado.', margin + 2, y);
+          y += 7;
+        } else {
+          const totalDays = wType === 'DAYS_30' ? 30 : 60;
+          const deliveredDate = repair.deliveredAt ? new Date(repair.deliveredAt) : new Date();
+          const expiryDate = new Date(deliveredDate.getTime() + totalDays * 24 * 60 * 60 * 1000);
+          const expiryStr = expiryDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
+          const startStr = deliveredDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
+
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(30, 30, 30);
+          doc.text(`${totalDays} días naturales en mano de obra y piezas instaladas.`, margin + 2, y); y += 6;
+          doc.setFontSize(8); doc.setTextColor(100, 100, 100);
+          doc.text(`Inicio: ${startStr}   Vence: ${expiryStr}`, margin + 2, y); y += 7;
+        }
+      }
+      y += 4;
 
       doc.setDrawColor(180, 180, 180);
       doc.line(margin, y + 14, margin + 70, y + 14);
