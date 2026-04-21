@@ -11,6 +11,7 @@ import { TicketButtons } from './TicketButtons';
 import { RepairTimeline } from './RepairTimeline';
 import { RepairWorkspace } from './RepairWorkspace';
 import { getSession } from '@/lib/auth';
+import { getBusinessSettings } from '@/lib/businessSettings';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,9 +28,9 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
       },
     }),
     getSession(),
-    prisma.setting.findUnique({ where: { key: 'businessName' } }),
+    getBusinessSettings(),
   ]);
-  const businessName = businessNameSetting?.value ?? 'TLAMATECH';
+  const biz = businessNameSetting;
 
   if (!repair) notFound();
 
@@ -151,17 +152,20 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
             {/* Tickets */}
             <div className="card p-5">
               <p className="section-title mb-4">Imprimir tickets</p>
-              <TicketButtons repair={{
-                ...repair,
-                createdAt: repair.createdAt.toISOString(),
-                dueDate: repair.dueDate?.toISOString() ?? null,
-                customer: {
-                  name: repair.customer.name,
-                  phone: repair.customer.phone,
-                  email: repair.customer.email,
-                  address: repair.customer.address,
-                },
-              }} />
+              <TicketButtons
+                biz={biz}
+                repair={{
+                  ...repair,
+                  createdAt: repair.createdAt.toISOString(),
+                  dueDate: repair.dueDate?.toISOString() ?? null,
+                  customer: {
+                    name: repair.customer.name,
+                    phone: repair.customer.phone,
+                    email: repair.customer.email,
+                    address: repair.customer.address,
+                  },
+                }}
+              />
             </div>
 
             {/* Status */}
@@ -180,7 +184,7 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                   customerName={repair.customer.name}
                   deviceBrand={repair.deviceBrand}
                   deviceModel={repair.deviceModel}
-                  businessName={businessName}
+                  businessName={biz.name}
                 />
               </div>
             </div>

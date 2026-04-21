@@ -4,12 +4,13 @@ import { Sidebar } from '@/components/Sidebar';
 import { BottomNav } from '@/components/BottomNav';
 import { Providers } from '@/components/Providers';
 import { getSession } from '@/lib/auth';
+import { getBusinessSettings } from '@/lib/businessSettings';
 
 export const metadata: Metadata = {
-  title: 'TLAMATECH — Sistema de Gestión',
-  description: 'Sistema de gestión para taller de reparación de dispositivos TLAMATECH',
+  title: 'RepairOS — Sistema de Gestión',
+  description: 'Sistema de gestión para taller de reparación de dispositivos electrónicos',
   manifest: '/manifest.json',
-  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'TLAMATECH' },
+  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'RepairOS' },
   icons: { apple: '/logo.png' },
 };
 
@@ -21,23 +22,20 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const session = await getSession();
+  const [session, biz] = await Promise.all([getSession(), getBusinessSettings()]);
 
   return (
     <html lang="es">
       <body className="flex h-screen overflow-hidden bg-[#080808]">
-        <Providers>
+        <Providers businessSettings={biz}>
           {session ? (
             <>
-              {/* Sidebar: solo visible en desktop */}
               <div className="hidden md:flex">
-                <Sidebar session={session} />
+                <Sidebar session={session} businessName={biz.name} />
               </div>
-              {/* Main content */}
               <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
                 {children}
               </main>
-              {/* Bottom nav: solo visible en móvil */}
               <BottomNav session={session} />
             </>
           ) : (

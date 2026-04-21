@@ -5,21 +5,23 @@ import { LogOut, Settings } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
+import { useBusinessSettings } from './BusinessSettingsContext';
 
 export function MobileHeader() {
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
   const isAdmin = (session?.user as any)?.role === 'ADMIN';
+  const { name: businessName } = useBusinessSettings();
 
   return (
     <header className="mobile-header">
       {/* Logo + nombre */}
       <div className="flex items-center gap-2.5">
         <div className="w-7 h-7 rounded-lg overflow-hidden bg-[#111] flex items-center justify-center flex-shrink-0">
-          <Image src="/logo.png" alt="TLAMATECH" width={28} height={28} className="object-contain" />
+          <Image src="/logo.png" alt={businessName} width={28} height={28} className="object-contain" />
         </div>
         <span className="text-sm font-bold text-white tracking-widest" style={{ fontFamily: 'IBM Plex Mono, monospace' }}>
-          TLAMATECH
+          {businessName}
         </span>
       </div>
 

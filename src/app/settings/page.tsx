@@ -5,7 +5,8 @@ import { prisma } from '@/lib/prisma';
 import { Users, Shield, Building2 } from 'lucide-react';
 import { NewUserForm } from './NewUserForm';
 import { UserList } from './UserList';
-import { BusinessNameForm } from './BusinessNameForm';
+import { BusinessSettingsForm } from './BusinessSettingsForm';
+import { getBusinessSettings } from '@/lib/businessSettings';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,14 +15,13 @@ export default async function SettingsPage() {
   const session = await getServerSession(authOptions);
   const currentUserId = (session?.user as any)?.id ?? 0;
 
-  const [users, businessNameSetting] = await Promise.all([
+  const [users, biz] = await Promise.all([
     prisma.user.findMany({
       select: { id: true, name: true, email: true, role: true, active: true, createdAt: true },
       orderBy: { createdAt: 'asc' },
     }),
-    prisma.setting.findUnique({ where: { key: 'businessName' } }),
+    getBusinessSettings(),
   ]);
-  const businessName = businessNameSetting?.value ?? 'TLAMATECH';
 
   return (
     <div className="p-6 max-w-3xl mx-auto animate-in">
@@ -36,7 +36,7 @@ export default async function SettingsPage() {
           <Building2 size={14} className="text-amber-500" />
           <h2 className="text-sm font-semibold text-[#ccc]">Información del negocio</h2>
         </div>
-        <BusinessNameForm current={businessName} />
+        <BusinessSettingsForm current={biz} />
       </div>
 
       <div className="card p-5 mb-5">

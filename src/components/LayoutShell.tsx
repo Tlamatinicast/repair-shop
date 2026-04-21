@@ -29,7 +29,7 @@ export function LayoutShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#080808]">
-      <Sidebar session={session} />
+      <Sidebar session={session} businessName="" />
       <main className="flex-1 overflow-y-auto">
         {children}
       </main>

@@ -8,6 +8,7 @@ import { SaleReceiptButton } from './SaleReceiptButton';
 import { CancelSaleButton } from './CancelSaleButton';
 import { AddPaymentButton } from './AddPaymentButton';
 import { getSession } from '@/lib/auth';
+import { getBusinessSettings } from '@/lib/businessSettings';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,12 +17,13 @@ const PAYMENT_LABELS: Record<string, string> = {
 };
 
 export default async function SaleDetailPage({ params }: { params: { id: string } }) {
-  const [sale, session] = await Promise.all([
+  const [sale, session, biz] = await Promise.all([
     prisma.sale.findUnique({
       where: { id: Number(params.id) },
       include: { customer: true, repair: true, items: { include: { item: true } }, payments: { orderBy: { createdAt: 'asc' } } },
     }),
     getSession(),
+    getBusinessSettings(),
   ]);
 
   if (!sale) notFound();
@@ -189,17 +191,20 @@ export default async function SaleDetailPage({ params }: { params: { id: string 
             {/* Actions */}
             <div className="card p-4 space-y-2">
               <p className="section-title mb-3">Acciones</p>
-              <SaleReceiptButton sale={{
-                saleNumber: sale.saleNumber,
-                createdAt: sale.createdAt.toISOString(),
-                subtotal: sale.subtotal,
-                discount: sale.discount,
-                total: sale.total,
-                paymentMethod: (sale as any).payments?.[0]?.paymentMethod ?? null,
-                notes: sale.notes,
-                customer: sale.customer ? { name: sale.customer.name, phone: sale.customer.phone } : null,
-                items: sale.items.map(i => ({ name: i.name, quantity: i.quantity, unitPrice: i.unitPrice, subtotal: i.subtotal })),
-              }} />
+              <SaleReceiptButton
+                bizName={biz.name}
+                sale={{
+                  saleNumber: sale.saleNumber,
+                  createdAt: sale.createdAt.toISOString(),
+                  subtotal: sale.subtotal,
+                  discount: sale.discount,
+                  total: sale.total,
+                  paymentMethod: (sale as any).payments?.[0]?.paymentMethod ?? null,
+                  notes: sale.notes,
+                  customer: sale.customer ? { name: sale.customer.name, phone: sale.customer.phone } : null,
+                  items: sale.items.map(i => ({ name: i.name, quantity: i.quantity, unitPrice: i.unitPrice, subtotal: i.subtotal })),
+                }}
+              />
               {remaining > 0 && (
                 <AddPaymentButton saleId={sale.id} remaining={remaining} />
               )}

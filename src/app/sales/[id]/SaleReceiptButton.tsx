@@ -20,7 +20,7 @@ interface SaleData {
   items: { name: string; quantity: number; unitPrice: number; subtotal: number }[];
 }
 
-export function SaleReceiptButton({ sale }: { sale: SaleData }) {
+export function SaleReceiptButton({ sale, bizName }: { sale: SaleData; bizName: string }) {
   const [loading, setLoading] = useState(false);
 
   const generate = async () => {
@@ -37,7 +37,7 @@ export function SaleReceiptButton({ sale }: { sale: SaleData }) {
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(12);
       doc.setTextColor(30, 30, 30);
-      doc.text('TLAMATECH', pageW / 2, y, { align: 'center' }); y += 5;
+      doc.text(bizName, pageW / 2, y, { align: 'center' }); y += 5;
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7);
       doc.setTextColor(100, 100, 100);
@@ -120,7 +120,7 @@ export function SaleReceiptButton({ sale }: { sale: SaleData }) {
       doc.setFontSize(7);
       doc.setTextColor(120, 120, 120);
       doc.text('¡Gracias por su compra!', pageW / 2, y, { align: 'center' }); y += 4;
-      doc.text('TLAMATECH', pageW / 2, y, { align: 'center' });
+      doc.text(bizName, pageW / 2, y, { align: 'center' });
 
       doc.save(`recibo-${sale.saleNumber}.pdf`);
     } catch (err) {

@@ -19,7 +19,7 @@ const allNav = [
   { href: '/reports',   label: 'Reportes',     icon: BarChart3,       adminOnly: true  },
 ];
 
-export function Sidebar({ session }: { session: any }) {
+export function Sidebar({ session, businessName }: { session: any; businessName: string }) {
   const pathname = usePathname();
   const isAdmin = session?.user?.role === 'ADMIN';
   const nav = allNav.filter(item => !item.adminOnly || isAdmin);
@@ -29,11 +29,11 @@ export function Sidebar({ session }: { session: any }) {
       <div className="px-5 py-4 border-b border-[#1a1a1a]">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 bg-[#111] flex items-center justify-center">
-            <Image src="/logo.png" alt="TLAMATECH" width={32} height={32} className="object-contain" />
+            <Image src="/logo.png" alt={businessName} width={32} height={32} className="object-contain" />
           </div>
           <div>
             <span className="text-sm font-bold text-white tracking-widest" style={{ fontFamily: 'IBM Plex Mono, monospace' }}>
-              TLAMATECH
+              {businessName}
             </span>
             <p className="text-[10px] text-[#555] mt-0.5">Taller de Reparación</p>
           </div>

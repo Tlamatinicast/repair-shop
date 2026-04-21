@@ -54,7 +54,9 @@ const CONTACT_LABELS: Record<string, string> = {
   WHATSAPP: 'WhatsApp', CALL: 'Llamada telefónica', EMAIL: 'Correo electrónico',
 };
 
-export function TicketButtons({ repair }: { repair: Repair }) {
+interface BizInfo { name: string; phone: string; domain: string; }
+
+export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo }) {
   const [loadingClient,   setLoadingClient]   = useState(false);
   const [loadingInternal, setLoadingInternal] = useState(false);
   const [loadingDelivery, setLoadingDelivery] = useState(false);
@@ -152,11 +154,12 @@ export function TicketButtons({ repair }: { repair: Repair }) {
       // ══════════════════════════════════════════════════════════════════════
       y = 14;
       doc.setFont('helvetica', 'bold'); doc.setFontSize(20); txt(...TEAL_D);
-      doc.text('TLAMATECH', margin, y);
+      doc.text(biz.name, margin, y);
       doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); txt(...GR4);
       doc.text('TALLER DE REPARACIÓN DE DISPOSITIVOS ELECTRÓNICOS', margin, y + 5.5);
       txt(...GRL);
-      doc.text('Mérida, Yucatán · tlamatech.com', margin, y + 10.5);
+      const contactLine = [biz.phone, biz.domain].filter(Boolean).join(' · ');
+      doc.text(contactLine || 'Mérida, Yucatán', margin, y + 10.5);
 
       // Folio (derecha)
       doc.setFont('helvetica', 'bold'); doc.setFontSize(20); txt(...TEAL_D);
@@ -295,7 +298,7 @@ export function TicketButtons({ repair }: { repair: Repair }) {
       doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); txt(...GR4);
       [
         'Tiempo estimado: 3–7 días hábiles, sujeto a disponibilidad de piezas.',
-        'TLAMATECH no se responsabiliza por pérdida de datos. Respalde su información.',
+        `${biz.name} no se responsabiliza por pérdida de datos. Respalde su información.`,
         'Equipos no reclamados después de 30 días generarán cargo por almacenaje.',
         'Garantía: 30 días en mano de obra y 90 días en piezas instaladas.',
       ].forEach((term, i) => {
@@ -366,10 +369,11 @@ export function TicketButtons({ repair }: { repair: Repair }) {
 
       doc.setFillColor(10, 10, 10); doc.rect(0, 0, pageW, 38, 'F');
       doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(251, 191, 36);
-      doc.text('TLAMATECH', margin, 16);
+      doc.text(biz.name, margin, 16);
       doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(150, 150, 150);
       doc.text('TALLER DE REPARACIÓN DE DISPOSITIVOS', margin, 22);
-      doc.text('Mérida, Yucatán · tlamatech.com', margin, 27);
+      const contactLine2 = [biz.phone, biz.domain].filter(Boolean).join(' · ');
+      doc.text(contactLine2 || 'Mérida, Yucatán', margin, 27);
       doc.setFont('courier', 'bold'); doc.setFontSize(11); doc.setTextColor(251, 191, 36);
       doc.text(repair.ticketNumber, pageW - margin, 16, { align: 'right' });
       doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(120, 120, 120);
@@ -453,7 +457,7 @@ export function TicketButtons({ repair }: { repair: Repair }) {
       doc.setFont('courier', 'bold'); doc.setFontSize(7); doc.setTextColor(251, 191, 36);
       doc.text(repair.ticketNumber, margin, 291);
       doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100);
-      doc.text('Gracias por su preferencia — TLAMATECH', pageW / 2, 291, { align: 'center' });
+      doc.text(`Gracias por su preferencia — ${biz.name}`, pageW / 2, 291, { align: 'center' });
       doc.text(`${new Date().toLocaleString('es-MX')}`, pageW - margin, 291, { align: 'right' });
 
       window.open(doc.output('bloburl'), '_blank');
@@ -473,7 +477,7 @@ export function TicketButtons({ repair }: { repair: Repair }) {
 
       doc.setFillColor(10, 10, 10); doc.rect(0, 0, 100, 70, 'F');
       doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(251, 191, 36);
-      doc.text('TLAMATECH', 5, 8);
+      doc.text(biz.name, 5, 8);
       doc.setFont('courier', 'bold'); doc.setFontSize(22); doc.setTextColor(255, 255, 255);
       doc.text(repair.ticketNumber, 5, 22);
       doc.setDrawColor(40, 40, 40); doc.line(5, 25, 68, 25);
