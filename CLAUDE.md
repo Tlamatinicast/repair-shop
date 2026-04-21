@@ -124,7 +124,7 @@ src/
 
 ## Estado actual al 2026-04-20
 
-**Último commit en `main`:** `8e4cb1f Nombre, teléfono y página del negocio configurables`
+**Último commit en `main`:** `9fa8485 Actualizar CLAUDE.md con estado al 2026-04-20`
 
 **En producción:** https://repair-shop-production-c450.up.railway.app  
 **Credenciales demo:** admin@repaiross.com / admin123 · tecnico@repaiross.com / tecnico123
