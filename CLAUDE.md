@@ -3,7 +3,7 @@
 > Este archivo se carga automáticamente al iniciar Claude Code en este repositorio.
 > Mantenerlo actualizado para que cualquier nueva sesión arranque ya informada.
 >
-> Última actualización: 2026-04-20
+> Última actualización: 2026-04-22
 
 ---
 
@@ -123,12 +123,62 @@ src/
 
 ---
 
-## Estado actual al 2026-04-21
+## Estado actual al 2026-04-22
 
 **Último commit en `main`:** `1aa67f0 Módulo de garantías — Capa 1 + Capa 2`
 
 **En producción:** https://repair-shop-production-c450.up.railway.app  
 **Credenciales demo:** admin@repaiross.com / admin123 · tecnico@repaiross.com / tecnico123
+
+---
+
+## 🔜 Próximo trabajo acordado — Importación de inventario desde Excel + DB limpia
+
+**Objetivo:** sacar el proyecto de "demo" a "en uso real en el taller". Tlami ya tiene un Excel con 96 refacciones reales y quiere cargarlo en vez de seguir con datos demo.
+
+### Archivo fuente
+- **Ruta:** `C:\Users\iFrogsMX\Documents\Relacion de inventario-refacciones.xlsx`
+- **Hoja:** `Inventario+csv`
+- **Filas de datos:** 96
+- **Columnas originales:** `Category | Name | Description | Cost | Price | Quantity`
+
+### Mapeo al schema `InventoryItem`
+
+| Excel | DB | Notas |
+|---|---|---|
+| Category | `category` | Normalizar formato |
+| Name | `name` | — |
+| Description | `description` | Opcional |
+| Cost | `costPrice` | — |
+| Price | `salePrice` | — |
+| Quantity | `quantity` | — |
+| *(nuevo)* SKU | `sku` | **Requerido y único** — se agrega en cowork |
+| *(opcional)* MinQuantity | `minQuantity` | Default `1` si no viene |
+| *(opcional)* Location | `location` | Default `null` si no viene |
+
+### Pendiente antes de la siguiente sesión (Tlami lo hará con Claude en cowork el 2026-04-23)
+
+Tlami trabajará el Excel con **Claude cowork** para resolver los siguientes problemas **antes** de retomar la implementación. No empezar a codificar hasta tener el Excel mejorado.
+
+1. **Agregar columna SKU** con patrón `{PREFIJO_CAT}-{ID_CORTO}` basado en Name/Description (ej. `BAT-CR2032`, `DIO-P6KE33A`, `MOS-AOZ5311`). SKUs deben ser únicos.
+2. **Consolidar duplicados** — hay al menos dos filas con `BOTON 3X4X2` y dos con `BOTON 3X4X2.5`. Decidir si se suman las cantidades o se diferencian.
+3. **Fila 90 con `Name` vacío** — completar o descartar.
+4. **Normalizar categorías** — mezcla de mayúsculas (`BATERIAS`) y Title Case (`Condensadores electroliticos`), doble espacio en `Centro de  carga`. Unificar a **Title Case en español** (`Baterías`, `Botones`, `Condensadores Electrolíticos`, `Centro de Carga`...).
+5. **Opcional:** agregar columnas `MinQuantity` y `Location` (ubicación física: gaveta/anaquel).
+
+### Plan de implementación (para cuando el Excel esté listo)
+
+1. **Validar el Excel mejorado:** leer con openpyxl/xlsx, confirmar unicidad de SKU y completitud de `Category`, `Name`, `SKU`, `Cost`, `Price`, `Quantity`.
+2. **Importador UI en `/inventory`:** botón que acepta `.xlsx` → muestra preview con validaciones (nuevos, duplicados de SKU, errores) → confirma y escribe en `prisma.$transaction`.
+3. **Exportador a Excel/CSV** desde el mismo módulo (primer paso del item "Exportación CSV/Excel por módulo" del roadmap).
+4. **Reset de DB demo** antes de cargar el inventario real. **Pendiente de confirmar con Tlami:** conservar usuarios Admin/Technician o borrar todo.
+
+### Decisiones de infraestructura tomadas (contexto, no urgentes)
+
+- **Hosting:** quedarse en Railway. Los planes de Hostinger compartido (Single/Premium/Business/Cloud Startup) **no sirven** para Next.js/Prisma — son para WordPress. Hostinger VPS sería peor que Railway.
+- **Dominio propio:** cuando Tlami quiera, comprar en **Cloudflare** (~MX$200/año) y apuntar a Railway. Sin urgencia.
+- **Correo con dominio propio:** empezar con **Cloudflare Email Routing** gratis (reenvío a Gmail personal); migrar a Google Workspace solo cuando haya 2-3 empleados con buzones separados.
+- **Impresión térmica (roadmap futuro):** Tlami ya tiene impresora térmica **80mm genérica con autocorte** + impresora normal tamaño carta. Quiere tickets de entrada y salida imprimibles en ambas. Para stickers con QR aún no tiene impresora de etiquetas; decisión de compra pendiente.
 
 ### Schema actual — modelo Setting
 
