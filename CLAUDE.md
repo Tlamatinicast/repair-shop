@@ -94,6 +94,7 @@ src/
 - **Gestión de usuarios** desde `/settings` — agregar, editar, desactivar y eliminar
 - **Notificaciones WhatsApp** — botón en detalle de reparación, mensaje prellenado por estado
 - **Configuración del negocio** (`/settings`) — nombre, teléfono y página/Facebook editables desde UI, guardados en tabla `Setting`. Se propagan a: tickets PDF, recibos de venta, sidebar, header móvil y login
+- **Módulo de garantías** — selector por orden (No aplica / 30 días / 60 días naturales), badge de estado vigente/vencida/anulada, registro de regreso en garantía (agrega entrada al timeline con días usados/restantes y mueve status a IN_REPAIR), anulación por equipo alterado. Garantía en ticket de salida (inicio + vencimiento); eliminada del ticket de entrada.
 
 ---
 
@@ -122,9 +123,9 @@ src/
 
 ---
 
-## Estado actual al 2026-04-20
+## Estado actual al 2026-04-21
 
-**Último commit en `main`:** `9fa8485 Actualizar CLAUDE.md con estado al 2026-04-20`
+**Último commit en `main`:** `1aa67f0 Módulo de garantías — Capa 1 + Capa 2`
 
 **En producción:** https://repair-shop-production-c450.up.railway.app  
 **Credenciales demo:** admin@repaiross.com / admin123 · tecnico@repaiross.com / tecnico123
@@ -142,7 +143,7 @@ Keys usadas: `businessName`, `businessPhone`, `businessDomain`
 
 ### Demás modelos clave
 
-- `Repair`: `advancePayment`, `paymentStatus`, `queueDate`, `dueDate`, `partsEta`, `isDefinedService`, `accessories`, `physicalCondition`, `clientSignature`, relaciones `sales`, `statusLogs`
+- `Repair`: `advancePayment`, `paymentStatus`, `queueDate`, `dueDate`, `partsEta`, `isDefinedService`, `accessories`, `physicalCondition`, `clientSignature`, `warrantyType`, `warrantyVoided`, `warrantyVoidReason`, relaciones `sales`, `statusLogs`
 - `User`: `id`, `name`, `email`, `password`, `role`, `active` — el `id` y `role` se incluyen en el JWT de sesión
 - `Sale`: `amountPaid`, `paymentStatus`, relación `payments: SalePayment[]`
 - `RepairNote`: `photoUrls: String?` (JSON array de URLs Cloudinary)
@@ -163,7 +164,7 @@ Keys usadas: `businessName`, `businessPhone`, `businessDomain`
 ## Roadmap — funciones pendientes
 
 ### De Samii
-- [ ] Módulo de garantías — folio con fecha de vencimiento al entregar
+- [x] Módulo de garantías — folio con fecha de vencimiento al entregar
 - [ ] Checklist de revisión/diagnóstico personalizable por orden
 - [ ] Statuses de reparación personalizables (no fijos en código)
 - [ ] Módulo de proveedores
