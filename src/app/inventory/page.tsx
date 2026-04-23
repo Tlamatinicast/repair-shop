@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
-import { formatCurrency, INVENTORY_CATEGORIES } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 import { MobileHeader } from '@/components/MobileHeader';
 import { InventoryImportButton } from '@/components/InventoryImportButton';
+import { InventoryCategorySelect } from '@/components/InventoryCategorySelect';
 import { getSession } from '@/lib/auth';
-import { Plus, AlertTriangle } from 'lucide-react';
+import { Plus, AlertTriangle, Download } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,11 @@ export default async function InventoryPage({ searchParams }: { searchParams: { 
 
   const lowStockCount = items.filter(i => i.quantity <= i.minQuantity).length;
 
+  const exportParams = new URLSearchParams();
+  if (q) exportParams.set('q', q);
+  if (category) exportParams.set('category', category);
+  const exportHref = `/api/inventory/export${exportParams.toString() ? `?${exportParams}` : ''}`;
+
   return (
     <div className="min-h-screen">
       <MobileHeader />
@@ -38,6 +44,12 @@ export default async function InventoryPage({ searchParams }: { searchParams: { 
             <h1 className="page-title">Inventario</h1>
           </div>
           <div className="flex items-center gap-2">
+            {isAdmin && (
+              <a href={exportHref} className="btn-secondary" title="Exportar a Excel (respeta filtros activos)">
+                <Download size={14} />
+                <span className="hidden sm:inline">Exportar</span>
+              </a>
+            )}
             {isAdmin && <InventoryImportButton />}
             <Link href="/inventory/new" className="btn-primary">
               <Plus size={15} />
@@ -54,17 +66,12 @@ export default async function InventoryPage({ searchParams }: { searchParams: { 
           </div>
         )}
 
-        <form className="mb-4">
-          <input name="q" defaultValue={q} placeholder="Buscar por nombre o SKU..." className="input" />
+        <form className="flex flex-col md:flex-row gap-2 mb-5">
+          <input name="q" defaultValue={q} placeholder="Buscar por nombre o SKU..." className="input md:flex-1" />
+          <div className="md:w-64">
+            <InventoryCategorySelect defaultValue={category} />
+          </div>
         </form>
-
-        {/* Category filters - horizontal scroll */}
-        <div className="flex gap-2 mb-5 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap">
-          <CatLink href="/inventory" active={!category} label="Todas" />
-          {INVENTORY_CATEGORIES.map(c => (
-            <CatLink key={c} href={`/inventory?category=${c}`} active={category === c} label={c} />
-          ))}
-        </div>
 
         {/* Desktop table */}
         <div className="card overflow-hidden hidden md:block">
@@ -146,14 +153,6 @@ export default async function InventoryPage({ searchParams }: { searchParams: { 
         </div>
       </div>
     </div>
-  );
-}
-
-function CatLink({ href, active, label }: { href: string; active: boolean; label: string }) {
-  return (
-    <Link href={href} className={`px-3 py-1.5 rounded-lg text-xs transition-all font-mono whitespace-nowrap flex-shrink-0 ${active ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'text-[#666] hover:text-[#aaa] border border-[#1e1e1e]'}`}>
-      {label}
-    </Link>
   );
 }
 

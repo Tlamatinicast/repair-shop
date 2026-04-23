@@ -32,8 +32,10 @@ type Preview = {
 type ApiResult = {
   ok: boolean;
   dryRun: boolean;
+  mode?: 'create' | 'upsert';
   preview?: Preview;
-  imported?: number;
+  created?: number;
+  updated?: number;
   error?: string;
 };
 
@@ -44,14 +46,15 @@ export function InventoryImportButton() {
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [importedCount, setImportedCount] = useState<number | null>(null);
+  const [result, setResult] = useState<{ created: number; updated: number } | null>(null);
+  const [mode, setMode] = useState<'create' | 'upsert'>('create');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function reset() {
     setFile(null);
     setPreview(null);
     setErrorMsg(null);
-    setImportedCount(null);
+    setResult(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
@@ -68,6 +71,7 @@ export function InventoryImportButton() {
       const fd = new FormData();
       fd.append('file', file);
       fd.append('dryRun', String(dryRun));
+      fd.append('mode', mode);
       const res = await fetch('/api/inventory/import', { method: 'POST', body: fd });
       const data: ApiResult = await res.json();
       if (!res.ok && !data.preview) {
@@ -77,7 +81,7 @@ export function InventoryImportButton() {
       if (data.preview) setPreview(data.preview);
       if (data.error) setErrorMsg(data.error);
       if (!dryRun && data.ok) {
-        setImportedCount(data.imported ?? 0);
+        setResult({ created: data.created ?? 0, updated: data.updated ?? 0 });
         router.refresh();
       }
     } catch (e: any) {
@@ -87,8 +91,9 @@ export function InventoryImportButton() {
     }
   }
 
-  const blocking = !!preview && (preview.errors.length > 0 || preview.duplicateSkusInFile.length > 0 || preview.existingSkusInDb.length > 0);
-  const canConfirm = !!preview && !blocking && importedCount === null;
+  const existingBlocks = mode === 'create' && !!preview && preview.existingSkusInDb.length > 0;
+  const blocking = !!preview && (preview.errors.length > 0 || preview.duplicateSkusInFile.length > 0 || existingBlocks);
+  const canConfirm = !!preview && !blocking && result === null;
 
   return (
     <>
@@ -116,7 +121,7 @@ export function InventoryImportButton() {
               </button>
             </div>
 
-            {importedCount === null && (
+            {result === null && (
               <>
                 <div className="mb-4">
                   <label className="label">Archivo .xlsx</label>
@@ -130,6 +135,26 @@ export function InventoryImportButton() {
                   <p className="text-xs text-[#555] mt-1.5">
                     Columnas esperadas: Category, Name, Description, Cost, Price, Quantity, SKU.
                   </p>
+                </div>
+
+                <div className="mb-4">
+                  <label className="label">Modo</label>
+                  <div className="flex flex-col gap-2">
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input type="radio" name="import-mode" checked={mode === 'create'} onChange={() => { setMode('create'); setPreview(null); }} className="mt-1" />
+                      <div className="text-sm">
+                        <p className="text-[#ddd]">Crear nuevos</p>
+                        <p className="text-xs text-[#666]">Falla si algún SKU ya existe en la base. Recomendado para alta inicial.</p>
+                      </div>
+                    </label>
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input type="radio" name="import-mode" checked={mode === 'upsert'} onChange={() => { setMode('upsert'); setPreview(null); }} className="mt-1" />
+                      <div className="text-sm">
+                        <p className="text-[#ddd]">Restaurar / actualizar</p>
+                        <p className="text-xs text-[#666]">Los SKUs existentes se actualizan con los valores del Excel; los nuevos se crean. Útil para restaurar un backup.</p>
+                      </div>
+                    </label>
+                  </div>
                 </div>
 
                 {!preview && (
@@ -154,13 +179,17 @@ export function InventoryImportButton() {
               </div>
             )}
 
-            {preview && importedCount === null && (
+            {preview && result === null && (
               <div className="space-y-3">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   <Stat label="Filas" value={preview.totalRows} />
                   <Stat label="Válidas" value={preview.validRows.length} />
                   <Stat label="Errores" value={preview.errors.length} warning={preview.errors.length > 0} />
-                  <Stat label="SKU conflicto" value={preview.duplicateSkusInFile.length + preview.existingSkusInDb.length} warning={preview.duplicateSkusInFile.length + preview.existingSkusInDb.length > 0} />
+                  <Stat
+                    label={mode === 'upsert' ? 'A actualizar' : 'SKU conflicto'}
+                    value={mode === 'upsert' ? preview.existingSkusInDb.length : preview.duplicateSkusInFile.length + preview.existingSkusInDb.length}
+                    warning={mode === 'create' && (preview.duplicateSkusInFile.length + preview.existingSkusInDb.length) > 0}
+                  />
                 </div>
 
                 {preview.errors.length > 0 && (
@@ -182,7 +211,10 @@ export function InventoryImportButton() {
 
                 {preview.existingSkusInDb.length > 0 && (
                   <Section title={`SKUs que ya existen en la DB (${preview.existingSkusInDb.length})`}>
-                    <p className="text-xs text-amber-400 font-mono">{preview.existingSkusInDb.join(', ')}</p>
+                    <p className={`text-xs font-mono ${mode === 'upsert' ? 'text-[#888]' : 'text-amber-400'}`}>
+                      {mode === 'upsert' ? 'Estos se actualizarán con los valores del Excel.' : 'En modo "Crear nuevos" estos bloquean la importación. Cambia a modo "Restaurar / actualizar" para sobrescribirlos.'}
+                    </p>
+                    <p className="text-xs text-[#666] font-mono mt-1">{preview.existingSkusInDb.join(', ')}</p>
                   </Section>
                 )}
 
@@ -210,11 +242,15 @@ export function InventoryImportButton() {
               </div>
             )}
 
-            {importedCount !== null && (
+            {result !== null && (
               <div className="text-center py-6">
                 <CheckCircle2 size={40} className="text-green-400 mx-auto mb-3" />
                 <p className="text-[#ddd] mb-1">Importación completa</p>
-                <p className="text-sm text-[#888] mb-5">{importedCount} artículo{importedCount !== 1 ? 's' : ''} agregado{importedCount !== 1 ? 's' : ''} al inventario.</p>
+                <p className="text-sm text-[#888] mb-5">
+                  {result.created > 0 && <>{result.created} creado{result.created !== 1 ? 's' : ''}</>}
+                  {result.created > 0 && result.updated > 0 && ' · '}
+                  {result.updated > 0 && <>{result.updated} actualizado{result.updated !== 1 ? 's' : ''}</>}
+                </p>
                 <button onClick={close} className="btn-primary">Cerrar</button>
               </div>
             )}

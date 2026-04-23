@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
   const file = formData.get('file');
   const dryRun = String(formData.get('dryRun') ?? 'true') !== 'false';
   const defaultMinQuantity = Number(formData.get('defaultMinQuantity') ?? 2) || 2;
+  const mode = String(formData.get('mode') ?? 'create') === 'upsert' ? 'upsert' : 'create';
 
   if (!(file instanceof Blob)) {
     return NextResponse.json({ error: 'Archivo requerido en el campo "file"' }, { status: 400 });
@@ -69,12 +70,18 @@ export async function POST(req: NextRequest) {
     categoriesSeen,
   };
 
-  const blockingIssues = errors.length > 0 || duplicateSkusInFile.length > 0 || existingSkusInDb.length > 0;
+  // Solo errores estructurales y duplicados dentro del archivo bloquean siempre.
+  // SKUs existentes en DB solo bloquean en modo 'create' — en 'upsert' se actualizan.
+  const blockingIssues =
+    errors.length > 0 ||
+    duplicateSkusInFile.length > 0 ||
+    (mode === 'create' && existingSkusInDb.length > 0);
 
   if (dryRun || blockingIssues) {
     return NextResponse.json({
       ok: !blockingIssues,
       dryRun: true,
+      mode,
       preview,
       ...(blockingIssues ? { error: 'Hay problemas que deben resolverse antes de importar' } : {}),
     });
@@ -83,27 +90,54 @@ export async function POST(req: NextRequest) {
   // Escritura real
   try {
     const result = await prisma.$transaction(async (tx) => {
-      const created: { sku: string }[] = [];
+      let created = 0;
+      let updated = 0;
       for (const r of parsed) {
-        const item = await tx.inventoryItem.create({
-          data: {
-            name: r.name,
-            sku: r.sku,
-            description: r.description,
-            quantity: r.quantity,
-            minQuantity: defaultMinQuantity,
-            costPrice: r.cost,
-            salePrice: r.price,
-            category: r.category,
-            location: null,
-          },
-          select: { sku: true },
-        });
-        created.push(item);
+        if (mode === 'upsert') {
+          const existed = await tx.inventoryItem.findUnique({ where: { sku: r.sku }, select: { id: true } });
+          await tx.inventoryItem.upsert({
+            where: { sku: r.sku },
+            create: {
+              name: r.name,
+              sku: r.sku,
+              description: r.description,
+              quantity: r.quantity,
+              minQuantity: defaultMinQuantity,
+              costPrice: r.cost,
+              salePrice: r.price,
+              category: r.category,
+              location: null,
+            },
+            update: {
+              name: r.name,
+              description: r.description,
+              quantity: r.quantity,
+              costPrice: r.cost,
+              salePrice: r.price,
+              category: r.category,
+            },
+          });
+          if (existed) updated++; else created++;
+        } else {
+          await tx.inventoryItem.create({
+            data: {
+              name: r.name,
+              sku: r.sku,
+              description: r.description,
+              quantity: r.quantity,
+              minQuantity: defaultMinQuantity,
+              costPrice: r.cost,
+              salePrice: r.price,
+              category: r.category,
+              location: null,
+            },
+          });
+          created++;
+        }
       }
-      return created;
+      return { created, updated };
     });
-    return NextResponse.json({ ok: true, dryRun: false, imported: result.length, preview });
+    return NextResponse.json({ ok: true, dryRun: false, mode, ...result, preview });
   } catch (e: any) {
     if (e?.code === 'P2002') {
       return NextResponse.json({ error: 'Conflicto de SKU durante la escritura' }, { status: 409 });
