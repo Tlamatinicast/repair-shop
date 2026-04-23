@@ -28,14 +28,14 @@ const MODULES: ModuleRow[] = [
   {
     key: 'repairs',
     label: 'Reparaciones',
-    description: 'Próximamente.',
+    description: 'Datos relacionales (piezas, fotos, notas, pagos). Respaldo vía pg_dump automatizado antes del release en campo — no aplica Excel.',
     exportHref: null,
     importControl: null,
   },
   {
     key: 'sales',
     label: 'Ventas',
-    description: 'Próximamente.',
+    description: 'Datos relacionales (ítems, pagos). Respaldo vía pg_dump automatizado antes del release en campo — no aplica Excel.',
     exportHref: null,
     importControl: null,
   },
@@ -50,9 +50,11 @@ export function BackupSection() {
       </div>
 
       <p className="text-xs text-[#666] mb-5 leading-relaxed">
-        Descarga un respaldo completo de cada módulo en formato Excel. Si más adelante
-        algo se daña en la base de datos, puedes restaurar el backup importando el
-        mismo archivo en modo &quot;Restaurar / actualizar&quot;.
+        Descarga un respaldo en Excel de los módulos planos (Clientes, Inventario).
+        Si más adelante algo se daña, puedes restaurar importando el mismo archivo
+        en modo &quot;Restaurar / actualizar&quot;. Para Reparaciones y Ventas el
+        respaldo real será el dump de la base de datos (pendiente de automatizar
+        antes del release en campo).
       </p>
 
       <div className="space-y-3">
@@ -63,7 +65,7 @@ export function BackupSection() {
           >
             <div className="min-w-0">
               <p className="text-sm text-[#ddd]">{m.label}</p>
-              <p className="text-xs text-[#666] truncate">{m.description}</p>
+              <p className="text-xs text-[#666] leading-relaxed">{m.description}</p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               {m.exportHref ? (
