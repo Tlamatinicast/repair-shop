@@ -1,5 +1,6 @@
 import { Download, Database } from 'lucide-react';
 import { InventoryImportButton } from '@/components/InventoryImportButton';
+import { CustomerImportButton } from '@/components/CustomerImportButton';
 
 type ModuleRow = {
   key: string;
@@ -20,9 +21,9 @@ const MODULES: ModuleRow[] = [
   {
     key: 'customers',
     label: 'Clientes',
-    description: 'Próximamente.',
-    exportHref: null,
-    importControl: null,
+    description: 'Datos de contacto: nombre, teléfono, correo, dirección y notas.',
+    exportHref: '/api/customers/export',
+    importControl: <CustomerImportButton />,
   },
   {
     key: 'repairs',
