@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Search, Plus, Minus, Trash2, ShoppingCart, User, Loader2, Tag, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/utils';
@@ -38,6 +38,9 @@ interface Customer {
 
 export default function NewSalePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const presetCustomerId = searchParams.get('customerId');
+  const presetRepairId   = searchParams.get('repairId');
 
   // Products
   const [products, setProducts]   = useState<Product[]>([]);
@@ -80,9 +83,21 @@ export default function NewSalePage() {
 
   useEffect(() => {
     fetch('/api/inventory').then(r => r.json()).then(setProducts);
-    fetch('/api/customers').then(r => r.json()).then(setCustomers);
-    fetch('/api/repairs').then(r => r.json()).then(setRepairs);
-  }, []);
+    fetch('/api/customers').then(r => r.json()).then((data: Customer[]) => {
+      setCustomers(data);
+      if (presetCustomerId) {
+        const match = data.find(c => c.id === Number(presetCustomerId));
+        if (match) setSelectedCustomer(match);
+      }
+    });
+    fetch('/api/repairs').then(r => r.json()).then((data: any[]) => {
+      setRepairs(data);
+      if (presetRepairId) {
+        const match = data.find(r => r.id === Number(presetRepairId));
+        if (match) setSelectedRepair(match);
+      }
+    });
+  }, [presetCustomerId, presetRepairId]);
 
   useEffect(() => {
     if (!search.trim()) { setFiltered([]); return; }

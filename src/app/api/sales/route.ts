@@ -100,21 +100,9 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // If linked to repair, recalculate totalCost
-      if (repairId) {
-        const repairWithTotals = await tx.repair.findUnique({
-          where: { id: Number(repairId) },
-          include: { parts: true, sales: true },
-        });
-        if (repairWithTotals) {
-          const partsTotal = repairWithTotals.parts.reduce((s: number, p: any) => s + p.unitPrice * p.quantity, 0);
-          const salesTotal = repairWithTotals.sales.reduce((s: number, sale: any) => s + sale.total, 0);
-          await tx.repair.update({
-            where: { id: Number(repairId) },
-            data: { totalCost: repairWithTotals.laborCost + partsTotal + salesTotal },
-          });
-        }
-      }
+      // Las ventas ligadas a una reparación (repairId) NO afectan su `totalCost`.
+      // Cada venta es independiente: se cobra por su cuenta en el POS y tiene
+      // su propio ticket. La relación queda solo para referencia/historial.
 
       return newSale;
     });

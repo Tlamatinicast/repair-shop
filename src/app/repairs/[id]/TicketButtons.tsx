@@ -351,16 +351,13 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
   const generateDeliveryTicket = async () => {
     setLoadingDelivery(true);
     try {
-      const [partsRes, salesRes] = await Promise.all([
-        fetch(`/api/repairs/${repair.id}/parts`),
-        fetch(`/api/sales?repairId=${repair.id}`),
-      ]);
+      // El ticket de entrega solo cubre la reparación (mano de obra + piezas).
+      // Las ventas ligadas a la orden tienen su propio ticket y no se incluyen.
+      const partsRes = await fetch(`/api/repairs/${repair.id}/parts`);
       const parts: any[] = partsRes.ok ? await partsRes.json() : [];
-      const sales: any[] = salesRes.ok ? await salesRes.json() : [];
 
       const partsTotal = parts.reduce((s: number, p: any) => s + p.unitPrice * p.quantity, 0);
-      const salesTotal = sales.reduce((s: number, sale: any) => s + sale.total, 0);
-      const total      = repair.laborCost + partsTotal + salesTotal;
+      const total      = repair.laborCost + partsTotal;
       const advance    = repair.advancePayment ?? 0;
       const pending    = Math.max(0, total - advance);
 
@@ -414,14 +411,6 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
         y += 2;
       }
 
-      if (sales.length > 0) {
-        section('Productos vendidos');
-        sales.forEach(sale => {
-          sale.items?.forEach((i: any) => { row(`${i.quantity}x ${i.name}`, fmt(i.unitPrice * i.quantity)); });
-        });
-        y += 2;
-      }
-
       section('Resumen de cobro');
       doc.setFillColor(250, 250, 250); doc.rect(margin, y, contentW, 50, 'F');
       doc.setDrawColor(220, 220, 220); doc.rect(margin, y, contentW, 50, 'S');
@@ -439,7 +428,6 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       y += 2;
       sumRow('Mano de obra', fmt(repair.laborCost));
       if (partsTotal > 0) sumRow('Piezas', fmt(partsTotal));
-      if (salesTotal > 0) sumRow('Productos vendidos', fmt(salesTotal));
       doc.setDrawColor(200, 200, 200); doc.line(margin + 4, y + 2, pageW - margin - 4, y + 2); y += 4;
       sumRow('TOTAL', fmt(total), true);
       if (advance > 0) sumRow('Anticipo recibido', `- ${fmt(advance)}`);

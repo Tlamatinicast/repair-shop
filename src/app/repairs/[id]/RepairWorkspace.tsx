@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  Search, Plus, Minus, Trash2, Loader2, Lock, CheckCircle,
-  Clock, DollarSign, AlertTriangle, ExternalLink,
+  Search, Plus, Trash2, Loader2, Lock, CheckCircle,
+  Clock, DollarSign, AlertTriangle, ExternalLink, ShoppingCart,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/utils';
@@ -72,9 +72,11 @@ export function RepairWorkspace({
   const [payments, setPayments] = useState<RepairPayment[]>(initialPayments);
 
   // Derived totals — always computed from current state
+  // Nota: las ventas asociadas (`sales`) NO suman al total de la orden.
+  // Cada venta es independiente, se cobra por POS y tiene su propio ticket.
   const partsTotal = parts.reduce((s, p) => s + p.unitPrice * p.quantity, 0);
-  const salesTotal = sales.reduce((s, sale) => s + sale.total, 0);
-  const total      = laborCost + partsTotal + salesTotal;
+  const salesTotal = sales.reduce((s, sale) => s + sale.total, 0); // solo informativo
+  const total      = laborCost + partsTotal;
   const pending    = Math.max(0, total - advance);
   const isPaid     = payStatus === 'PAID';
 
@@ -89,17 +91,6 @@ export function RepairWorkspace({
   const [reserved, setReserved]   = useState(false);
   const [addingPart, setAddingPart] = useState(false);
   const [partError, setPartError] = useState('');
-
-  // ── Sales state ──
-  const [showSaleForm, setShowSaleForm] = useState(false);
-  const [saleCart, setSaleCart]         = useState<any[]>([]);
-  const [saleSearch, setSaleSearch]     = useState('');
-  const [saleFiltered, setSaleFiltered] = useState<InventoryItem[]>([]);
-  const [showSaleSearch, setShowSaleSearch] = useState(false);
-  const [salePayMethod, setSalePayMethod]   = useState('CASH');
-  const [saleDiscount, setSaleDiscount]     = useState(0);
-  const [addingSale, setAddingSale]         = useState(false);
-  const [saleError, setSaleError]           = useState('');
 
   // ── Payment state ──
   const [showAddPayment, setShowAddPayment] = useState(false);
@@ -121,17 +112,10 @@ export function RepairWorkspace({
     setFiltered(inventory.filter(i => i.name.toLowerCase().includes(q) || i.sku.toLowerCase().includes(q)).slice(0, 6));
   }, [search, inventory]);
 
-  // Sale search filter
-  useEffect(() => {
-    if (!saleSearch.trim()) { setSaleFiltered([]); return; }
-    const q = saleSearch.toLowerCase();
-    setSaleFiltered(inventory.filter(i => i.quantity > 0 && (i.name.toLowerCase().includes(q) || i.sku.toLowerCase().includes(q))).slice(0, 6));
-  }, [saleSearch, inventory]);
-
   // ── Parts handlers ────────────────────────────────────────────────────────
 
   const selectItem = (item: InventoryItem) => {
-    setSelected(item); setPrice(item.costPrice); setQty(1);
+    setSelected(item); setPrice(item.salePrice); setQty(1);
     setSearch(''); setFiltered([]);
   };
 
@@ -181,39 +165,6 @@ export function RepairWorkspace({
     } catch { alert('Error al confirmar.'); }
   };
 
-  // ── Sales handlers ────────────────────────────────────────────────────────
-
-  const addToSaleCart = (item: InventoryItem) => {
-    setSaleCart(prev => {
-      const ex = prev.find(i => i.itemId === item.id);
-      if (ex) return ex.quantity >= item.quantity ? prev : prev.map(i => i.itemId === item.id ? { ...i, quantity: i.quantity + 1 } : i);
-      return [...prev, { itemId: item.id, name: item.name, unitPrice: item.salePrice, quantity: 1, stock: item.quantity }];
-    });
-    setSaleSearch(''); setSaleFiltered([]);
-  };
-
-  const handleAddSale = async () => {
-    if (saleCart.length === 0) { setSaleError('Agrega al menos un producto.'); return; }
-    setAddingSale(true); setSaleError('');
-    try {
-      const res = await fetch('/api/sales', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerId, repairId,
-          items: saleCart.map(i => ({ itemId: i.itemId, name: i.name, quantity: i.quantity, unitPrice: i.unitPrice })),
-          discount: saleDiscount,
-          paymentMethod: salePayMethod,
-        }),
-      });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
-      const sale = await res.json();
-      setSales(prev => [sale, ...prev]);
-      setSaleCart([]); setSaleDiscount(0); setShowSaleForm(false);
-    } catch (err: any) { setSaleError(err.message); }
-    finally { setAddingSale(false); }
-  };
-
   // ── Payment handlers ──────────────────────────────────────────────────────
 
   const openAddPayment = (preset?: number) => {
@@ -254,8 +205,6 @@ export function RepairWorkspace({
     } catch (e: any) { alert(e.message ?? 'Error al anular'); }
   };
 
-  const saleCartTotal = saleCart.reduce((s, i) => s + i.unitPrice * i.quantity, 0) - saleDiscount;
-
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
@@ -267,7 +216,6 @@ export function RepairWorkspace({
         <div className="space-y-2">
           <SumRow label="Mano de obra"       value={laborCost}   />
           <SumRow label="Piezas"             value={partsTotal}  />
-          {salesTotal > 0 && <SumRow label="Productos vendidos" value={salesTotal} />}
           <div className="flex justify-between items-center pt-2 border-t border-[#1e1e1e]">
             <span className="text-sm font-semibold text-[#ddd]">Total</span>
             <span className="font-mono text-base font-semibold text-amber-400">{formatCurrency(total)}</span>
@@ -446,7 +394,7 @@ export function RepairWorkspace({
                         <p className="text-xs text-[#555] font-mono">{item.sku}</p>
                       </div>
                       <div className="text-right ml-2 flex-shrink-0">
-                        <p className="text-xs font-mono text-amber-400">{formatCurrency(item.costPrice)}</p>
+                        <p className="text-xs font-mono text-amber-400">{formatCurrency(item.salePrice)}</p>
                         <p className={`text-[10px] font-mono ${available <= 0 ? 'text-red-400' : 'text-[#555]'}`}>
                           {available} disp.
                         </p>
@@ -513,17 +461,25 @@ export function RepairWorkspace({
         </div>
       </div>
 
-      {/* ── PRODUCTOS VENDIDOS ── */}
+      {/* ── PRODUCTOS VENDIDOS (solo informativo) ── */}
+      {/* Las ventas ligadas a esta orden se registran desde el POS. */}
+      {/* Aquí solo aparecen como referencia; no suman al total de la orden. */}
       <div className="card p-5">
-        <p className="section-title mb-4">Productos vendidos</p>
-        {sales.length > 0 && (
+        <div className="flex items-center justify-between mb-4">
+          <p className="section-title mb-0">Productos vendidos</p>
+          <span className="text-[10px] text-[#555] font-mono">solo informativo</span>
+        </div>
+
+        {sales.length > 0 ? (
           <div className="space-y-2 mb-4">
             {sales.map(sale => (
               <div key={sale.id} className="flex items-center gap-3 p-3 bg-[#0f0f0f] border border-[#1a1a1a] rounded-xl">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-mono text-xs text-amber-500">{sale.saleNumber}</span>
-                    <span className="text-[10px] text-[#555] font-mono">{PAYMENT_METHODS[sale.paymentMethod as keyof typeof PAYMENT_METHODS] ?? sale.paymentMethod}</span>
+                    {sale.paymentMethod && (
+                      <span className="text-[10px] text-[#555] font-mono">{PAYMENT_METHODS[sale.paymentMethod as keyof typeof PAYMENT_METHODS] ?? sale.paymentMethod}</span>
+                    )}
                   </div>
                   <p className="text-xs text-[#666] truncate">{sale.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}</p>
                 </div>
@@ -536,91 +492,20 @@ export function RepairWorkspace({
               </div>
             ))}
             <div className="flex justify-between px-1 pt-1 border-t border-[#1a1a1a]">
-              <span className="text-xs text-[#666]">Total en productos</span>
-              <span className="font-mono text-sm font-semibold text-amber-400">{formatCurrency(salesTotal)}</span>
+              <span className="text-xs text-[#666]">Total en productos (no suma a la orden)</span>
+              <span className="font-mono text-sm text-[#888]">{formatCurrency(salesTotal)}</span>
             </div>
           </div>
+        ) : (
+          <p className="text-xs text-[#444] text-center py-2 mb-4">Sin productos vendidos asociados.</p>
         )}
 
-        {!showSaleForm ? (
-          <button onClick={() => setShowSaleForm(true)} className="btn-secondary w-full justify-center">
-            <Plus size={13} /> Vender producto a este cliente
-          </button>
-        ) : (
-          <div className="border border-[#1e1e1e] rounded-xl p-4 bg-[#0d0d0d] space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-[#ccc]">Agregar venta</p>
-              <button onClick={() => { setShowSaleForm(false); setSaleCart([]); setSaleError(''); }} className="text-[#555] hover:text-[#999] text-xs">Cancelar</button>
-            </div>
-            <div className="relative">
-              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#555]" />
-              <input value={saleSearch} onChange={e => setSaleSearch(e.target.value)}
-                onFocus={() => setShowSaleSearch(true)} onBlur={() => setTimeout(() => setShowSaleSearch(false), 150)}
-                placeholder="Buscar producto..." className="input pl-9 text-sm" />
-              {showSaleSearch && saleFiltered.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-[#111] border border-[#222] rounded-xl overflow-hidden z-30 shadow-xl">
-                  {saleFiltered.map(p => (
-                    <button key={p.id} onMouseDown={() => addToSaleCart(p)}
-                      className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-[#1a1a1a] text-left">
-                      <div>
-                        <p className="text-sm text-[#ddd]">{p.name}</p>
-                        <p className="text-xs text-[#555] font-mono">{p.sku}</p>
-                      </div>
-                      <span className="font-mono text-xs text-amber-400 ml-2 flex-shrink-0">{formatCurrency(p.salePrice)}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            {saleCart.length > 0 && (
-              <div className="space-y-1.5">
-                {saleCart.map(item => (
-                  <div key={item.itemId} className="flex items-center gap-2 p-2 bg-[#111] rounded-lg">
-                    <p className="text-xs text-[#ccc] flex-1 truncate">{item.name}</p>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <button onClick={() => setSaleCart(prev => prev.map(i => i.itemId === item.itemId ? { ...i, quantity: Math.max(1, i.quantity - 1) } : i))}
-                        className="w-5 h-5 rounded bg-[#1a1a1a] flex items-center justify-center text-[#888] hover:text-white">
-                        <Minus size={9} />
-                      </button>
-                      <span className="font-mono text-xs text-[#ddd] w-4 text-center">{item.quantity}</span>
-                      <button onClick={() => setSaleCart(prev => prev.map(i => i.itemId === item.itemId && i.quantity < i.stock ? { ...i, quantity: i.quantity + 1 } : i))}
-                        className="w-5 h-5 rounded bg-[#1a1a1a] flex items-center justify-center text-[#888] hover:text-white">
-                        <Plus size={9} />
-                      </button>
-                    </div>
-                    <span className="font-mono text-xs text-amber-400 w-16 text-right flex-shrink-0">{formatCurrency(item.unitPrice * item.quantity)}</span>
-                    <button onClick={() => setSaleCart(prev => prev.filter(i => i.itemId !== item.itemId))} className="text-[#444] hover:text-red-400 transition-colors">
-                      <Trash2 size={11} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="label text-[9px]">Método de pago</label>
-                <select value={salePayMethod} onChange={e => setSalePayMethod(e.target.value)} className="select text-xs">
-                  {Object.entries(PAYMENT_METHODS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="label text-[9px]">Descuento (MXN)</label>
-                <input type="number" min="0" step="0.01" value={saleDiscount || ''} onChange={e => setSaleDiscount(parseFloat(e.target.value) || 0)} placeholder="0.00" className="input text-xs" />
-              </div>
-            </div>
-            {saleCart.length > 0 && (
-              <div className="flex justify-between px-1">
-                <span className="text-xs text-[#666]">Total a cobrar</span>
-                <span className="font-mono text-sm font-bold text-amber-400">{formatCurrency(saleCartTotal)}</span>
-              </div>
-            )}
-            {saleError && <p className="text-xs text-red-400">{saleError}</p>}
-            <button onClick={handleAddSale} disabled={addingSale || saleCart.length === 0}
-              className="btn-primary w-full justify-center disabled:opacity-40 text-sm">
-              {addingSale ? <><Loader2 size={13} className="animate-spin" /> Procesando...</> : <><Plus size={13} /> Registrar venta · {formatCurrency(saleCartTotal)}</>}
-            </button>
-          </div>
-        )}
+        <Link
+          href={`/sales/new?customerId=${customerId}&repairId=${repairId}`}
+          className="btn-secondary w-full justify-center"
+        >
+          <ShoppingCart size={13} /> Registrar venta en POS
+        </Link>
       </div>
     </div>
   );
