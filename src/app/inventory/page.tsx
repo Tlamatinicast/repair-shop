@@ -2,12 +2,16 @@ import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { formatCurrency, INVENTORY_CATEGORIES } from '@/lib/utils';
 import { MobileHeader } from '@/components/MobileHeader';
+import { InventoryImportButton } from '@/components/InventoryImportButton';
+import { getSession } from '@/lib/auth';
 import { Plus, AlertTriangle } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
 export default async function InventoryPage({ searchParams }: { searchParams: { q?: string; category?: string } }) {
   const { q, category } = searchParams;
+  const session = await getSession();
+  const isAdmin = (session?.user as any)?.role === 'ADMIN';
 
   const items = await prisma.inventoryItem.findMany({
     where: {
@@ -33,11 +37,14 @@ export default async function InventoryPage({ searchParams }: { searchParams: { 
             <p className="section-title mb-0.5">Almacén</p>
             <h1 className="page-title">Inventario</h1>
           </div>
-          <Link href="/inventory/new" className="btn-primary">
-            <Plus size={15} />
-            <span className="hidden sm:inline">Agregar pieza</span>
-            <span className="sm:hidden">Agregar</span>
-          </Link>
+          <div className="flex items-center gap-2">
+            {isAdmin && <InventoryImportButton />}
+            <Link href="/inventory/new" className="btn-primary">
+              <Plus size={15} />
+              <span className="hidden sm:inline">Agregar pieza</span>
+              <span className="sm:hidden">Agregar</span>
+            </Link>
+          </div>
         </div>
 
         {lowStockCount > 0 && (

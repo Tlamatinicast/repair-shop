@@ -22,8 +22,12 @@ export const DEVICE_TYPES = [
 ];
 
 export const INVENTORY_CATEGORIES = [
-  'Pantallas', 'Baterías', 'Almacenamiento', 'Memorias RAM',
-  'Consumibles', 'Consolas', 'GPU', 'Cables', 'Accesorios', 'Otro',
+  'Baterías', 'Botones', 'Centro de Carga', 'Condensadores Electrolíticos',
+  'Diodos', 'DisplayPort Retimer IC', 'DRMosfet', 'EC/KBC/Super IO',
+  'Hack IC', 'IC Almacenamiento', 'IC Audio', 'IC Carga',
+  'IC Controlador', 'IC Regulador', 'IC Switch', 'IC USB',
+  'IC WiFi/LAN', 'Joystick', 'Mosfet', 'PMIC',
+  'Placa Buck Converter', 'Puerto HDMI', 'Puerto USB', 'VRAM',
 ];
 
 export function formatCurrency(amount: number): string {

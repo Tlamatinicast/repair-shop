@@ -78,7 +78,7 @@ model InventoryItem {
   description     String?
   quantity        Int          @default(0)
   reservedQty     Int          @default(0)
-  minQuantity     Int          @default(1)
+  minQuantity     Int          @default(2)
   costPrice       Float        @default(0)
   salePrice       Float        @default(0)
   category        String
