@@ -26,6 +26,7 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
         repairNotes: { orderBy: { createdAt: 'desc' } },
         sales: { include: { items: true }, orderBy: { createdAt: 'desc' } },
         statusLogs: { orderBy: { startedAt: 'asc' } },
+        payments: { orderBy: { createdAt: 'asc' } },
       },
     }),
     getSession(),
@@ -148,6 +149,11 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
               }))}
               initialAdvance={repair.advancePayment}
               initialPaymentStatus={repair.paymentStatus}
+              initialPayments={repair.payments.map(p => ({
+                id: p.id, amount: p.amount, paymentMethod: p.paymentMethod,
+                notes: p.notes, createdAt: p.createdAt.toISOString(),
+              }))}
+              isAdmin={(session?.user as any)?.role === 'ADMIN'}
             />
 
             {/* Garantía */}

@@ -2,15 +2,16 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Wrench, Users, ShoppingBag, Package } from 'lucide-react';
+import { LayoutDashboard, Wrench, Users, ShoppingBag, Package, Calculator } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const allNav = [
-  { href: '/',          label: 'Inicio',   icon: LayoutDashboard, adminOnly: false },
-  { href: '/repairs',   label: 'Órdenes',  icon: Wrench,          adminOnly: false },
-  { href: '/sales',     label: 'Ventas',   icon: ShoppingBag,     adminOnly: false },
-  { href: '/customers', label: 'Clientes', icon: Users,           adminOnly: false },
-  { href: '/inventory', label: 'Stock',    icon: Package,         adminOnly: false },
+  { href: '/',               label: 'Inicio',   icon: LayoutDashboard, adminOnly: false },
+  { href: '/repairs',        label: 'Órdenes',  icon: Wrench,          adminOnly: false },
+  { href: '/sales',          label: 'Ventas',   icon: ShoppingBag,     adminOnly: false },
+  { href: '/customers',      label: 'Clientes', icon: Users,           adminOnly: false },
+  { href: '/inventory',      label: 'Stock',    icon: Package,         adminOnly: false },
+  { href: '/corte-de-caja',  label: 'Corte',    icon: Calculator,      adminOnly: true  },
 ];
 
 export function BottomNav({ session }: { session: any }) {

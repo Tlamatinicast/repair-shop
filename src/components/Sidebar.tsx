@@ -6,7 +6,7 @@ import { signOut } from 'next-auth/react';
 import Image from 'next/image';
 import {
   LayoutDashboard, Wrench, Users, Package, BarChart3,
-  ShoppingBag, Settings, ChevronRight, LogOut,
+  ShoppingBag, Settings, ChevronRight, LogOut, Calculator,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -15,8 +15,9 @@ const allNav = [
   { href: '/repairs',   label: 'Reparaciones', icon: Wrench,          adminOnly: false },
   { href: '/customers', label: 'Clientes',     icon: Users,           adminOnly: false },
   { href: '/inventory', label: 'Inventario',   icon: Package,         adminOnly: false },
-  { href: '/sales',     label: 'Ventas',       icon: ShoppingBag,     adminOnly: false },
-  { href: '/reports',   label: 'Reportes',     icon: BarChart3,       adminOnly: true  },
+  { href: '/sales',          label: 'Ventas',         icon: ShoppingBag,     adminOnly: false },
+  { href: '/corte-de-caja',  label: 'Corte de caja',  icon: Calculator,      adminOnly: true  },
+  { href: '/reports',        label: 'Reportes',       icon: BarChart3,       adminOnly: true  },
 ];
 
 export function Sidebar({ session, businessName }: { session: any; businessName: string }) {

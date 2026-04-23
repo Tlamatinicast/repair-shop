@@ -29,6 +29,14 @@ interface Sale {
   items: { name: string; quantity: number; unitPrice: number }[];
 }
 
+interface RepairPayment {
+  id: number;
+  amount: number;
+  paymentMethod: string;
+  notes: string | null;
+  createdAt: string;
+}
+
 interface Props {
   repairId: number;
   customerId: number;
@@ -37,15 +45,22 @@ interface Props {
   initialSales: Sale[];
   initialAdvance: number;
   initialPaymentStatus: string;
+  initialPayments: RepairPayment[];
+  isAdmin: boolean;
 }
 
 const PAYMENT_METHODS = { CASH: 'Efectivo', CARD: 'Tarjeta', TRANSFER: 'Transferencia' };
+const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  CASH: 'Efectivo', CARD: 'Tarjeta', TRANSFER: 'Transferencia',
+  OTHER: 'Otro', UNKNOWN: 'No especificado',
+};
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function RepairWorkspace({
   repairId, customerId, laborCost,
   initialParts, initialSales, initialAdvance, initialPaymentStatus,
+  initialPayments, isAdmin,
 }: Props) {
   const router = useRouter();
 
@@ -54,6 +69,7 @@ export function RepairWorkspace({
   const [sales, setSales]     = useState<Sale[]>(initialSales);
   const [advance, setAdvance] = useState(initialAdvance);
   const [payStatus, setPayStatus] = useState(initialPaymentStatus);
+  const [payments, setPayments] = useState<RepairPayment[]>(initialPayments);
 
   // Derived totals — always computed from current state
   const partsTotal = parts.reduce((s, p) => s + p.unitPrice * p.quantity, 0);
@@ -86,9 +102,12 @@ export function RepairWorkspace({
   const [saleError, setSaleError]           = useState('');
 
   // ── Payment state ──
-  const [editingPayment, setEditingPayment] = useState(false);
-  const [payInputVal, setPayInputVal]       = useState(String(initialAdvance));
+  const [showAddPayment, setShowAddPayment] = useState(false);
+  const [payAmount, setPayAmount]           = useState('');
+  const [payMethod, setPayMethod]           = useState<'CASH' | 'CARD' | 'TRANSFER'>('CASH');
+  const [payNotes, setPayNotes]             = useState('');
   const [savingPay, setSavingPay]           = useState(false);
+  const [payError, setPayError]             = useState('');
 
   // Load inventory once
   useEffect(() => {
@@ -197,32 +216,42 @@ export function RepairWorkspace({
 
   // ── Payment handlers ──────────────────────────────────────────────────────
 
-  const handleSavePayment = async () => {
-    setSavingPay(true);
-    const newAdvance = parseFloat(payInputVal) || 0;
-    const newStatus  = newAdvance >= total ? 'PAID' : 'PENDING';
+  const openAddPayment = (preset?: number) => {
+    setPayAmount(preset && preset > 0 ? String(preset.toFixed(2)) : '');
+    setPayMethod('CASH'); setPayNotes(''); setPayError('');
+    setShowAddPayment(true);
+  };
+
+  const handleAddPayment = async () => {
+    const amt = parseFloat(payAmount);
+    if (!Number.isFinite(amt) || amt <= 0) { setPayError('Monto inválido.'); return; }
+    setSavingPay(true); setPayError('');
     try {
-      await fetch(`/api/repairs/${repairId}/payment`, {
-        method: 'PATCH',
+      const res = await fetch(`/api/repairs/${repairId}/payments`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ advancePayment: newAdvance, paymentStatus: newStatus }),
+        body: JSON.stringify({ amount: amt, paymentMethod: payMethod, notes: payNotes || undefined }),
       });
-      setAdvance(newAdvance); setPayStatus(newStatus); setEditingPayment(false);
-    } catch { alert('Error al guardar.'); }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Error al guardar');
+      setPayments(data.payments ?? []);
+      setAdvance(data.advancePayment ?? 0);
+      setPayStatus(data.paymentStatus ?? 'PENDING');
+      setShowAddPayment(false);
+    } catch (e: any) { setPayError(e.message ?? 'Error'); }
     finally { setSavingPay(false); }
   };
 
-  const handleMarkPaid = async () => {
-    setSavingPay(true);
+  const handleVoidPayment = async (paymentId: number) => {
+    if (!confirm('¿Anular este pago? Se restará del total recibido.')) return;
     try {
-      await fetch(`/api/repairs/${repairId}/payment`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ advancePayment: total, paymentStatus: 'PAID' }),
-      });
-      setAdvance(total); setPayStatus('PAID');
-    } catch { alert('Error.'); }
-    finally { setSavingPay(false); }
+      const res = await fetch(`/api/repairs/${repairId}/payments/${paymentId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setPayments(data.payments ?? []);
+      setAdvance(data.advancePayment ?? 0);
+      setPayStatus(data.paymentStatus ?? 'PENDING');
+    } catch (e: any) { alert(e.message ?? 'Error al anular'); }
   };
 
   const saleCartTotal = saleCart.reduce((s, i) => s + i.unitPrice * i.quantity, 0) - saleDiscount;
@@ -261,7 +290,7 @@ export function RepairWorkspace({
         </div>
 
         <div className="space-y-1.5 px-1 mb-3">
-          <SumRow label="Anticipo recibido" value={advance} color="text-green-400" />
+          <SumRow label="Total recibido" value={advance} color="text-green-400" />
           {!isPaid && (
             <div className="flex justify-between text-xs font-semibold pt-1 border-t border-[#1a1a1a]">
               <span className="text-[#888]">Saldo pendiente</span>
@@ -270,30 +299,84 @@ export function RepairWorkspace({
           )}
         </div>
 
-        {editingPayment ? (
-          <div className="space-y-2">
+        {/* Lista de pagos */}
+        {payments.length > 0 && (
+          <div className="space-y-1.5 mb-3">
+            {payments.map(p => (
+              <div key={p.id} className="flex items-center gap-2 p-2 bg-[#0f0f0f] border border-[#1a1a1a] rounded-lg">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm text-green-400">{formatCurrency(p.amount)}</span>
+                    <span className="text-[10px] text-[#888] font-mono">{PAYMENT_METHOD_LABEL[p.paymentMethod] ?? p.paymentMethod}</span>
+                  </div>
+                  <p className="text-[10px] text-[#555] font-mono">
+                    {new Date(p.createdAt).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    {p.notes && ` · ${p.notes}`}
+                  </p>
+                </div>
+                {isAdmin && (
+                  <button onClick={() => handleVoidPayment(p.id)} title="Anular pago" className="text-[#444] hover:text-red-400 transition-colors p-1">
+                    <Trash2 size={11} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {showAddPayment ? (
+          <div className="space-y-2 border border-[#1e1e1e] rounded-xl p-3 bg-[#0d0d0d]">
             <div>
-              <label className="label text-[9px]">Anticipo recibido (MXN)</label>
-              <input type="number" min="0" step="0.01" value={payInputVal}
-                onChange={e => setPayInputVal(e.target.value)} className="input" autoFocus />
+              <label className="label text-[9px]">Monto recibido (MXN)</label>
+              <input type="number" min="0" step="0.01" value={payAmount}
+                onChange={e => setPayAmount(e.target.value)} className="input text-sm" autoFocus placeholder="0.00" />
             </div>
+            <div>
+              <label className="label text-[9px]">Método de pago</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {(Object.entries(PAYMENT_METHODS) as [keyof typeof PAYMENT_METHODS, string][]).map(([k, v]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setPayMethod(k)}
+                    className={`py-2 rounded-lg text-xs font-medium border transition-all ${
+                      payMethod === k
+                        ? 'bg-amber-500/10 border-amber-500/40 text-amber-400'
+                        : 'bg-[#111] border-[#1e1e1e] text-[#666] hover:border-[#2a2a2a]'
+                    }`}
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="label text-[9px]">Nota (opcional)</label>
+              <input type="text" value={payNotes} onChange={e => setPayNotes(e.target.value)} className="input text-sm" placeholder="Referencia, # transacción..." />
+            </div>
+            {payError && (
+              <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-2">
+                <AlertTriangle size={12} /> {payError}
+              </div>
+            )}
             <div className="flex gap-2">
-              <button onClick={() => setEditingPayment(false)} className="btn-ghost flex-1 justify-center text-xs">Cancelar</button>
-              <button onClick={handleSavePayment} disabled={savingPay} className="btn-primary flex-1 justify-center text-xs disabled:opacity-50">
-                {savingPay ? <Loader2 size={12} className="animate-spin" /> : 'Guardar'}
+              <button onClick={() => setShowAddPayment(false)} className="btn-ghost flex-1 justify-center text-xs">Cancelar</button>
+              <button onClick={handleAddPayment} disabled={savingPay} className="btn-primary flex-1 justify-center text-xs disabled:opacity-50">
+                {savingPay ? <Loader2 size={12} className="animate-spin" /> : <><Plus size={12} /> Registrar</>}
               </button>
             </div>
           </div>
         ) : (
           <div className="flex gap-2">
-            <button onClick={() => { setEditingPayment(true); setPayInputVal(String(advance)); }}
-              className="btn-secondary flex-1 justify-center text-xs">
-              <DollarSign size={12} /> Anticipo
+            <button onClick={() => openAddPayment()} disabled={isPaid || total === 0}
+              className="btn-secondary flex-1 justify-center text-xs disabled:opacity-40">
+              <DollarSign size={12} /> Agregar pago
             </button>
-            {!isPaid && (
-              <button onClick={handleMarkPaid} disabled={savingPay || total === 0}
-                className="btn-primary flex-1 justify-center text-xs disabled:opacity-40">
-                {savingPay ? <Loader2 size={12} className="animate-spin" /> : <><CheckCircle size={12} /> Pagado</>}
+            {!isPaid && pending > 0 && (
+              <button onClick={() => openAddPayment(pending)} disabled={total === 0}
+                className="btn-primary flex-1 justify-center text-xs disabled:opacity-40"
+                title={`Cobrar saldo restante: ${formatCurrency(pending)}`}>
+                <CheckCircle size={12} /> Cobrar saldo
               </button>
             )}
           </div>
