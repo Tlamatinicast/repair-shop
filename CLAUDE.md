@@ -3,7 +3,7 @@
 > Este archivo se carga automáticamente al iniciar Claude Code en este repositorio.
 > Mantenerlo actualizado para que cualquier nueva sesión arranque ya informada.
 >
-> Última actualización: 2026-04-22
+> Última actualización: 2026-04-22 (cierre de sesión)
 
 ---
 
@@ -52,21 +52,29 @@ Estados de pago (`paymentStatus`): `PENDING → PARTIAL → PAID` (aplica tanto 
 ```
 prisma/
   schema.prisma           # Modelos: Customer, Repair, InventoryItem, RepairPart,
-                          #   RepairPhoto, RepairNote, Sale, SaleItem,
+                          #   RepairPhoto, RepairNote, RepairPayment, Sale, SaleItem,
                           #   SalePayment, RepairStatusLog, User, Setting
   migrations/             # Migraciones PostgreSQL
   seed.ts, seed.users.ts
 src/
   app/
     api/                  # REST endpoints — todos requieren sesión
-      repairs/[id]/       # route.ts, notes/, parts/, payment/, photos/
+      repairs/[id]/       # route.ts, notes/, parts/, photos/,
+                          #   payment/ (legacy — solo paymentStatus),
+                          #   payments/ (POST nuevo + DELETE [paymentId] admin)
       sales/              # route.ts, [id]/(route.ts, payments/), stats/
-      customers/, inventory/, stats/, users/[id]/, auth/[...nextauth]/
+      inventory/          # route.ts, [id]/, import/ (POST admin), export/ (GET admin)
+      cash-close/         # export/ (GET admin) — corte de caja a Excel
+      customers/, stats/, users/[id]/, auth/[...nextauth]/
       settings/           # GET (público) y PUT (admin) — clave/valor del negocio
-    repairs/, customers/, inventory/, sales/, reports/, settings/, login/
-  components/             # Sidebar, BottomNav, MobileHeader, BusinessSettingsContext, ui/
+    repairs/, customers/, inventory/, sales/, reports/, settings/, login/,
+    corte-de-caja/        # vista admin con filtro de periodo + conciliación efectivo
+  components/             # Sidebar, BottomNav, MobileHeader, BusinessSettingsContext,
+                          #   InventoryImportButton, InventoryCategorySelect, ui/
   lib/                    # prisma.ts, auth.ts, authOptions.ts, cloudinary.ts, utils.ts,
-                          #   businessSettings.ts (helper cacheado con React.cache)
+                          #   businessSettings.ts (React.cache),
+                          #   inventoryImport.ts (parser + CATEGORY_NORMALIZATION),
+                          #   cashClose.ts (helpers timezone MX + agregaciones)
   types/
 ```
 
@@ -95,6 +103,9 @@ src/
 - **Notificaciones WhatsApp** — botón en detalle de reparación, mensaje prellenado por estado
 - **Configuración del negocio** (`/settings`) — nombre, teléfono y página/Facebook editables desde UI, guardados en tabla `Setting`. Se propagan a: tickets PDF, recibos de venta, sidebar, header móvil y login
 - **Módulo de garantías** — selector por orden (No aplica / 30 días / 60 días naturales), badge de estado vigente/vencida/anulada, registro de regreso en garantía (agrega entrada al timeline con días usados/restantes y mueve status a IN_REPAIR), anulación por equipo alterado. Garantía en ticket de salida (inicio + vencimiento); eliminada del ticket de entrada.
+- **Importador + exportador de inventario Excel** — UI inline en /inventory ("Exportar vista" respeta filtros activos `?q=&category=`). Backup completo + restauración viven en `/settings → Backup y restauración` (`src/app/settings/BackupSection.tsx`, con placeholders para Clientes/Reparaciones/Ventas). Importador soporta modos `create` (default) y `upsert` (sobrescribe existentes — para restaurar backup). Normalización hardcoded de categorías en `src/lib/inventoryImport.ts → CATEGORY_NORMALIZATION`. `INVENTORY_CATEGORIES` en `src/lib/utils.ts` ya tiene las 24 categorías reales. Default global de `minQuantity` ahora es `2`.
+- **Pagos de reparaciones por evento (`RepairPayment`)** — espejo de `SalePayment`. Cada pago tiene amount + paymentMethod (CASH/CARD/TRANSFER/OTHER/UNKNOWN) + notes + createdAt. UI en `RepairWorkspace.tsx` reemplazó la edición directa del anticipo por: lista de pagos + botón "Agregar pago" (radios de método) + "Cobrar saldo" (precarga restante) + botón anular admin. `Repair.advancePayment` queda como total denormalizado.
+- **Corte de caja** (`/corte-de-caja`, admin only) — presets Hoy/Ayer/Esta semana/Este mes + rango custom. Cards: Total recaudado, Ventas POS, Cobros reparaciones, # transacciones. Desglose por método con barras. Lista cronológica de movimientos (union SalePayment + RepairPayment). Helper de conciliación de efectivo (input físico vs registrado, no persiste). Export a .xlsx con dos hojas (Resumen + Movimientos) vía `GET /api/cash-close/export`. Item nuevo en Sidebar y BottomNav (admin only).
 
 ---
 
@@ -120,58 +131,46 @@ src/
 14. **`LayoutShell.tsx`** es un componente legacy que aún existe — si se modifica `Sidebar`, recordar actualizar también `LayoutShell` (actualmente pasa `businessName=""`).
 15. **Script de start en producción:** `prisma migrate deploy && next start`.
 16. **Fotos:** Cloudinary (cloud: dpd8cifms). NO usar filesystem local en producción.
+17. **Pagos como evento, no como total editable:** tanto `SalePayment` como `RepairPayment` son inmutables (insert + delete, no update). `amountPaid`/`advancePayment` son denormalizados (suma de pagos). Refunds/correcciones se hacen anulando el pago vía DELETE y registrando uno nuevo. NO recrear UI de "editar monto directo" — rompe el corte de caja.
+18. **Timezone para corte de caja:** todo el cálculo de fechas en `src/lib/cashClose.ts` usa **America/Mexico_City (UTC-6 fijo)** porque MX ya no usa horario de verano desde 2022. Usar `rangeForPreset()` y `parseDateOrNull()` — no `new Date()` directo.
+19. **xlsx + NextResponse:** `XLSX.write(wb, { type: 'buffer' })` devuelve `Buffer`, que TS no acepta como BodyInit. Envolver en `new Uint8Array(buffer)` antes de pasar a `NextResponse`.
+20. **`exportHref` con filtros activos:** patrón ya usado en /inventory — construir `URLSearchParams` desde los `searchParams` de la página y pasarlo a un `<a href>` plano (no `<Link>`, para que el browser descargue sin interceptar).
 
 ---
 
-## Estado actual al 2026-04-22
+## Estado actual al 2026-04-22 (cierre de sesión)
 
-**Último commit en `main`:** `1aa67f0 Módulo de garantías — Capa 1 + Capa 2`
+**Último commit en `main`:** `b9b4960 Corte de caja v1 + RepairPayment con metodo`
+
+**Sesión cerró con:** importador + exportador de inventario funcionando en producción, RepairPayment migrado con backfill, UI de pagos de reparación rediseñada, módulo Corte de caja v1 desplegado, item nuevo en sidebar/bottom-nav. Tlami validó cada pieza en producción.
 
 **En producción:** https://repair-shop-production-c450.up.railway.app  
 **Credenciales demo:** admin@repaiross.com / admin123 · tecnico@repaiross.com / tecnico123
 
 ---
 
-## 🔜 Próximo trabajo acordado — Importación de inventario desde Excel + DB limpia
+## 🔜 Próximo trabajo acordado — Backup de Clientes (sesión 2026-04-23)
 
-**Objetivo:** sacar el proyecto de "demo" a "en uso real en el taller". Tlami ya tiene un Excel con 96 refacciones reales y quiere cargarlo en vez de seguir con datos demo.
+**Objetivo:** replicar el patrón de export/import de Inventario al módulo de Clientes. Es el más simple porque la tabla `Customer` es plana (sin relaciones internas que importen para round-trip).
 
-### Archivo fuente
-- **Ruta:** `C:\Users\iFrogsMX\Documents\Relacion de inventario-refacciones.xlsx`
-- **Hoja:** `Inventario+csv`
-- **Filas de datos:** 96
-- **Columnas originales:** `Category | Name | Description | Cost | Price | Quantity`
+### Plan
 
-### Mapeo al schema `InventoryItem`
+1. **`GET /api/customers/export` (admin)** — .xlsx round-trip respetando query params del filtro (si los hay en /customers). Columnas mínimas: `Name | Phone | Email | Address | Notes` + cualquier otro campo del modelo `Customer`. Filename: `clientes-{businessSlug}-{YYYY-MM-DD}.xlsx`.
+2. **`POST /api/customers/import` (admin, multipart, dryRun + transacción)** — modos `create` y `upsert`. ¿Por qué columna se hace el upsert? Probablemente `phone` (es lo más cercano a un identificador natural). Confirmar con Tlami antes.
+3. **Activar fila "Clientes" en `src/app/settings/BackupSection.tsx`** — cambiar `exportHref: null` por la URL real y `importControl: null` por un componente análogo a `InventoryImportButton`.
+4. **Decisión pendiente:** ¿el botón "Exportar" inline también va en `/customers` o solo el backup completo en /settings? Aplicar la regla: si hay un caso de uso real de "exportar lo que estoy filtrando", va inline. Si no, solo backup.
 
-| Excel | DB | Notas |
-|---|---|---|
-| Category | `category` | Normalizar formato |
-| Name | `name` | — |
-| Description | `description` | Opcional |
-| Cost | `costPrice` | — |
-| Price | `salePrice` | — |
-| Quantity | `quantity` | — |
-| *(nuevo)* SKU | `sku` | **Requerido y único** — se agrega en cowork |
-| *(opcional)* MinQuantity | `minQuantity` | Default `1` si no viene |
-| *(opcional)* Location | `location` | Default `null` si no viene |
+### Decisión ya tomada — NO hacer round-trip Excel para Reparaciones / Ventas
 
-### Pendiente antes de la siguiente sesión (Tlami lo hará con Claude en cowork el 2026-04-23)
+Para "backup real" de Reparaciones y Ventas, depender de los **snapshots automáticos de Postgres en Railway** (esos son el verdadero backup, ya nativos). Razón: estos modelos tienen tablas relacionadas (RepairPart, RepairPhoto, RepairNote, SaleItem, RepairPayment, SalePayment) que no caben en una hoja plana sin perder datos, y el restore desde multi-hoja es propenso a bugs por re-mapeo de FK.
 
-Tlami trabajará el Excel con **Claude cowork** para resolver los siguientes problemas **antes** de retomar la implementación. No empezar a codificar hasta tener el Excel mejorado.
+Para reportes, el **Corte de caja** ya cubre el ángulo financiero. Si más adelante hace falta export operativo (lista de reparaciones del mes para el contador, ventas por técnico, etc.), agregar **export-only** en cada página correspondiente. Marcar las filas de Reparaciones/Ventas en `BackupSection.tsx` con texto que aclare que NO son backups completos sino reportes.
 
-1. **Agregar columna SKU** con patrón `{PREFIJO_CAT}-{ID_CORTO}` basado en Name/Description (ej. `BAT-CR2032`, `DIO-P6KE33A`, `MOS-AOZ5311`). SKUs deben ser únicos.
-2. **Consolidar duplicados** — hay al menos dos filas con `BOTON 3X4X2` y dos con `BOTON 3X4X2.5`. Decidir si se suman las cantidades o se diferencian.
-3. **Fila 90 con `Name` vacío** — completar o descartar.
-4. **Normalizar categorías** — mezcla de mayúsculas (`BATERIAS`) y Title Case (`Condensadores electroliticos`), doble espacio en `Centro de  carga`. Unificar a **Title Case en español** (`Baterías`, `Botones`, `Condensadores Electrolíticos`, `Centro de Carga`...).
-5. **Opcional:** agregar columnas `MinQuantity` y `Location` (ubicación física: gaveta/anaquel).
+### Otros pendientes futuros
 
-### Plan de implementación (para cuando el Excel esté listo)
-
-1. **Validar el Excel mejorado:** leer con openpyxl/xlsx, confirmar unicidad de SKU y completitud de `Category`, `Name`, `SKU`, `Cost`, `Price`, `Quantity`.
-2. **Importador UI en `/inventory`:** botón que acepta `.xlsx` → muestra preview con validaciones (nuevos, duplicados de SKU, errores) → confirma y escribe en `prisma.$transaction`.
-3. **Exportador a Excel/CSV** desde el mismo módulo (primer paso del item "Exportación CSV/Excel por módulo" del roadmap).
-4. **Reset de DB demo** antes de cargar el inventario real. **Pendiente de confirmar con Tlami:** conservar usuarios Admin/Technician o borrar todo.
+- **Reset de DB demo** — diferido. Se ejecutará cuando Tlami "lance" la página para uso definitivo. Falta decidir si conservar usuarios Admin/Technician o borrar todo.
+- **6 items en BottomNav para admin** — vigilar si en el celular de Tlami se ve apretado tras agregar Corte de caja; si sí, considerar mover Corte solo a sidebar+settings y dejar bottom-nav solo con los 5 operativos.
+- **Pagos históricos con método UNKNOWN** — los anticipos previos al 2026-04-22 quedaron como "No especificado" en el corte de caja porque el backfill no podía saber el método original. Es ruido aceptable; con el tiempo se diluye conforme entran pagos nuevos con método registrado.
 
 ### Decisiones de infraestructura tomadas (contexto, no urgentes)
 
@@ -230,10 +229,16 @@ Keys usadas: `businessName`, `businessPhone`, `businessDomain`
 - [ ] Análisis de horas pico y reportes avanzados con gráficas
 
 ### Independientes (propias de TLAMATECH)
-- [ ] Exportación CSV/Excel por módulo *(Admin only)*
-- [ ] Importación de inventario desde Excel *(tienes un Excel con refacciones)*
+- [x] Importación de inventario desde Excel — funcionando con 96 refacciones reales
+- [x] Exportación a Excel para inventario — round-trip completo, respeta filtros
+- [x] Sección de backup centralizada en /settings (placeholders para módulos restantes)
+- [x] Pagos de reparación con método (RepairPayment + UI rediseñada)
+- [x] Corte de caja v1 (vista en vivo con desglose por método y conciliación)
+- [ ] Backup de Clientes (siguiente — 2026-04-23)
+- [ ] Export-only para reportes operativos de Reparaciones/Ventas (pendiente, decidir cuándo se necesite)
 - [ ] DB limpia sin datos demo para producción
 - [ ] Expansión de `deviceType` para módulos vehiculares y dispositivos médicos
+- [ ] Cierre de caja persistente (Corte de caja v2: registros históricos `CashClose` con snapshot de totales y conteo físico — diferido hasta validar v1 con uso real)
 
 ---
 
