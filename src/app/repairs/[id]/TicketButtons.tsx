@@ -347,7 +347,7 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
     finally { setLoadingClient(false); }
   };
 
-  // ── DELIVERY TICKET (A4 full summary) ────────────────────────────────────
+  // ── DELIVERY TICKET — estilo teal moderno, consistente con ticket de entrada ──
   const generateDeliveryTicket = async () => {
     setLoadingDelivery(true);
     try {
@@ -360,123 +360,314 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       const total      = repair.laborCost + partsTotal;
       const advance    = repair.advancePayment ?? 0;
       const pending    = Math.max(0, total - advance);
+      const isPaid     = pending <= 0 && total > 0;
 
       const { jsPDF } = await import('jspdf');
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       const pageW = 210; const margin = 18; const contentW = pageW - margin * 2;
+
+      // ── Color helpers (misma paleta que ticket de entrada) ───────────────
+      const fill = (r: number, g: number, b: number) => doc.setFillColor(r, g, b);
+      const draw = (r: number, g: number, b: number) => doc.setDrawColor(r, g, b);
+      const txt  = (r: number, g: number, b: number) => doc.setTextColor(r, g, b);
+
+      const TEAL_D  = [15, 110, 86]   as const; // #0F6E56
+      const TEAL_M  = [29, 158, 117]  as const; // #1D9E75
+      const TEAL_L  = [225, 245, 238] as const; // #E1F5EE
+      const TEAL_B  = [159, 225, 203] as const; // #9FE1CB
+      const TEAL_DP = [8, 80, 65]     as const; // #085041
+      const GR4     = [136, 135, 128] as const; // #888780
+      const GR6     = [95, 94, 90]    as const; // #5f5e5a
+      const GR9     = [44, 44, 42]    as const; // #2c2c2a
+      const GRL     = [180, 178, 169] as const; // #b4b2a9
+      const SEP     = [232, 232, 228] as const; // #e8e8e4
+      const FT_BG   = [250, 250, 248] as const; // #fafaf8
+      const WARN_BG = [255, 247, 237] as const; // #fff7ed
+      const WARN_BD = [186, 117, 23]  as const; // #BA7517
+      const WARN_TX = [133, 79, 11]   as const; // #854F0B
+      const RED_TX  = [180, 50, 50]   as const;
+
+      // White page background
+      fill(255, 255, 255); doc.rect(0, 0, pageW, 297, 'F');
+
       let y = 0;
 
-      doc.setFillColor(10, 10, 10); doc.rect(0, 0, pageW, 38, 'F');
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(251, 191, 36);
-      doc.text(biz.name, margin, 16);
-      doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(150, 150, 150);
-      doc.text('TALLER DE REPARACIÓN DE DISPOSITIVOS', margin, 22);
-      const contactLine2 = [biz.phone, biz.domain].filter(Boolean).join(' · ');
-      doc.text(contactLine2 || 'Mérida, Yucatán', margin, 27);
-      doc.setFont('courier', 'bold'); doc.setFontSize(11); doc.setTextColor(251, 191, 36);
-      doc.text(repair.ticketNumber, pageW - margin, 16, { align: 'right' });
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(120, 120, 120);
-      doc.text('COMPROBANTE DE ENTREGA', pageW - margin, 21, { align: 'right' });
-      doc.text(new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' }), pageW - margin, 26, { align: 'right' });
-
-      y = 46;
-      const section = (title: string) => {
-        doc.setFillColor(245, 245, 245); doc.rect(margin, y, contentW, 7, 'F');
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(80, 80, 80);
-        doc.text(title.toUpperCase(), margin + 3, y + 5); y += 11;
+      // ── Helpers ───────────────────────────────────────────────────────────
+      const sep = (full = false) => {
+        draw(...SEP); doc.setLineWidth(0.3);
+        doc.line(full ? 0 : margin, y, full ? pageW : pageW - margin, y);
+        y += 4;
       };
-      const row = (label: string, value: string, bold = false) => {
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(100, 100, 100);
-        doc.text(label, margin + 2, y);
-        doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setTextColor(30, 30, 30);
-        const lines = doc.splitTextToSize(value || '—', contentW - 55);
-        doc.text(lines, margin + 52, y); y += Math.max(lines.length * 5.5, 6.5);
+      const sLabel = (text: string) => {
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); txt(...TEAL_D);
+        doc.text(text, margin, y); y += 6;
+      };
+      const col1 = margin;
+      const col2 = margin + contentW / 2 + 2;
+      const colW = contentW / 2 - 4;
+      const drawField = (label: string, value: string, x: number, bold = false): number => {
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8); txt(...GR4);
+        doc.text(label, x, y);
+        doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setFontSize(10); txt(...GR9);
+        const lines = doc.splitTextToSize(value || '—', colW);
+        doc.text(lines, x, y + 4.5);
+        return 4.5 + lines.length * 4.5 + 1;
+      };
+      const row2 = (l1: string, v1: string, b1: boolean, l2: string, v2: string, b2 = false) => {
+        const h1 = drawField(l1, v1, col1, b1);
+        const h2 = drawField(l2, v2, col2, b2);
+        y += Math.max(h1, h2) + 3;
       };
 
-      section('Datos del cliente');
-      row('Nombre:', repair.customer.name, true);
-      row('Teléfono:', repair.customer.phone);
-      y += 2;
+      // ══════════════════════════════════════════════════════════════════════
+      // HEADER
+      // ══════════════════════════════════════════════════════════════════════
+      y = 14;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(20); txt(...TEAL_D);
+      doc.text(biz.name, margin, y);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); txt(...GR4);
+      doc.text('TALLER DE REPARACIÓN DE DISPOSITIVOS ELECTRÓNICOS', margin, y + 5.5);
+      txt(...GRL);
+      const contactLine = [biz.phone, biz.domain].filter(Boolean).join(' · ');
+      doc.text(contactLine || 'Mérida, Yucatán', margin, y + 10.5);
 
-      section('Dispositivo entregado');
-      row('Tipo:', repair.deviceType);
-      row('Marca / Modelo:', `${repair.deviceBrand} ${repair.deviceModel}`, true);
-      if (repair.serialNumber) row('No. Serie:', repair.serialNumber);
-      if (repair.diagnosis) { y += 2; row('Diagnóstico:', repair.diagnosis); }
-      y += 2;
+      // Folio (derecha)
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(20); txt(...TEAL_D);
+      doc.text(repair.ticketNumber, pageW - margin, y, { align: 'right' });
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); txt(...GR4);
+      const deliveryDate = repair.deliveredAt ? new Date(repair.deliveredAt) : new Date();
+      doc.text(
+        deliveryDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' }),
+        pageW - margin, y + 6, { align: 'right' }
+      );
 
-      if (parts.length > 0) {
-        section('Piezas utilizadas');
-        parts.forEach(p => { row(`${p.quantity}x ${p.item?.name ?? 'Pieza'}`, fmt(p.unitPrice * p.quantity)); });
-        y += 2;
+      // Badge de estado (Pagado / Saldo pendiente)
+      {
+        const badgeText = isPaid ? 'Pagado' : 'Saldo pendiente';
+        doc.setFontSize(7.5); doc.setFont('helvetica', 'bold');
+        const bw = doc.getTextWidth(badgeText) + 10;
+        if (isPaid) {
+          fill(...TEAL_L); draw(...TEAL_B);
+        } else {
+          fill(...WARN_BG); draw(...WARN_BD);
+        }
+        doc.setLineWidth(0.3);
+        doc.roundedRect(pageW - margin - bw, y + 8.5, bw, 5.5, 1, 1, 'FD');
+        if (isPaid) txt(...TEAL_DP); else txt(...WARN_TX);
+        doc.text(badgeText, pageW - margin - bw / 2, y + 12.5, { align: 'center' });
       }
 
-      section('Resumen de cobro');
-      doc.setFillColor(250, 250, 250); doc.rect(margin, y, contentW, 50, 'F');
-      doc.setDrawColor(220, 220, 220); doc.rect(margin, y, contentW, 50, 'S');
+      y = 30;
+      sep(true);
+      y -= 3;
 
-      const sumRow = (label: string, value: string, highlight = false) => {
-        doc.setFont('helvetica', highlight ? 'bold' : 'normal');
-        doc.setFontSize(highlight ? 10 : 8.5);
-        doc.setTextColor(highlight ? 30 : 80, highlight ? 30 : 80, highlight ? 30 : 80);
-        doc.text(label, margin + 4, y + 6);
-        if (highlight) doc.setTextColor(180, 120, 10);
-        doc.text(value, pageW - margin - 4, y + 6, { align: 'right' });
-        y += 9;
+      // ── Banda teal "Comprobante de entrega" ──────────────────────────────
+      fill(...TEAL_L); doc.rect(0, y, pageW, 7.5, 'F');
+      draw(...TEAL_B); doc.setLineWidth(0.3);
+      doc.line(0, y + 7.5, pageW, y + 7.5);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); txt(...TEAL_DP);
+      doc.text('COMPROBANTE DE ENTREGA', margin, y + 5.2);
+      y += 10;
+
+      // ══════════════════════════════════════════════════════════════════════
+      // SECCIÓN: CLIENTE
+      // ══════════════════════════════════════════════════════════════════════
+      y += 3;
+      sLabel('Datos del cliente');
+      row2('Nombre', repair.customer.name, true, 'Teléfono', repair.customer.phone, false);
+
+      sep();
+
+      // ══════════════════════════════════════════════════════════════════════
+      // SECCIÓN: DISPOSITIVO
+      // ══════════════════════════════════════════════════════════════════════
+      sLabel('Dispositivo entregado');
+      row2('Tipo', repair.deviceType, true, 'Marca / Modelo', `${repair.deviceBrand} ${repair.deviceModel}`, true);
+      if (repair.serialNumber) {
+        const h = drawField('No. de serie', repair.serialNumber, col1, false);
+        y += h + 3;
+      }
+
+      sep();
+
+      // ══════════════════════════════════════════════════════════════════════
+      // SECCIÓN: PIEZAS UTILIZADAS (tabla)
+      // ══════════════════════════════════════════════════════════════════════
+      if (parts.length > 0) {
+        sLabel('Piezas utilizadas');
+
+        // Columnas de la tabla: Cant. (15) / Descripción (flexible) / Precio unit. (28) / Importe (28)
+        const colCant = margin;
+        const colDesc = margin + 15;
+        const colUnit = pageW - margin - 56;
+        const colImp  = pageW - margin;
+        const descW   = colUnit - colDesc - 4;
+
+        // Header
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); txt(...GR4);
+        doc.text('CANT.', colCant, y);
+        doc.text('DESCRIPCIÓN', colDesc, y);
+        doc.text('PRECIO UNIT.', colUnit, y, { align: 'right' });
+        doc.text('IMPORTE', colImp, y, { align: 'right' });
+        y += 2;
+        draw(...SEP); doc.setLineWidth(0.3); doc.line(margin, y, pageW - margin, y);
+        y += 4;
+
+        // Rows
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); txt(...GR9);
+        parts.forEach(p => {
+          const name = p.item?.name ?? 'Pieza';
+          const descLines = doc.splitTextToSize(name, descW);
+          const rowH = Math.max(descLines.length * 4.5, 5);
+          doc.text(`${p.quantity}×`, colCant, y);
+          doc.text(descLines, colDesc, y);
+          doc.text(fmt(p.unitPrice), colUnit, y, { align: 'right' });
+          doc.setFont('helvetica', 'bold');
+          doc.text(fmt(p.unitPrice * p.quantity), colImp, y, { align: 'right' });
+          doc.setFont('helvetica', 'normal');
+          y += rowH + 2;
+          draw(241, 239, 232); doc.setLineWidth(0.2); doc.line(margin, y - 1, pageW - margin, y - 1);
+        });
+        y += 2;
+
+        sep();
+      }
+
+      // ══════════════════════════════════════════════════════════════════════
+      // SECCIÓN: RESUMEN DE COBRO
+      // ══════════════════════════════════════════════════════════════════════
+      sLabel('Resumen de cobro');
+
+      const cobroRow = (label: string, value: string, opts: { bold?: boolean; muted?: boolean; total?: boolean } = {}) => {
+        const { bold, muted, total } = opts;
+        doc.setFont('helvetica', (bold || total) ? 'bold' : 'normal');
+        doc.setFontSize(total ? 11 : (muted ? 9 : 10));
+        if (total) txt(...TEAL_D);
+        else if (muted) txt(...GR4);
+        else txt(...GR6);
+        doc.text(label, margin + 2, y);
+        if (total) txt(...TEAL_D);
+        else if (muted) txt(...GR4);
+        else txt(...GR9);
+        doc.setFont('helvetica', 'bold');
+        doc.text(value, pageW - margin - 2, y, { align: 'right' });
+        y += total ? 7 : 5.5;
       };
 
+      cobroRow('Mano de obra', fmt(repair.laborCost));
+      if (partsTotal > 0) cobroRow('Piezas', fmt(partsTotal));
+      y += 1;
+      draw(...SEP); doc.setLineWidth(0.3); doc.line(margin + 2, y, pageW - margin - 2, y);
+      y += 4;
+      cobroRow('Total', fmt(total), { total: true });
+      if (advance > 0) cobroRow('Anticipo recibido', `− ${fmt(advance)}`, { muted: true });
+      if (isPaid && advance < total && total > 0) {
+        cobroRow('Pago final', `− ${fmt(total - advance)}`, { muted: true });
+      }
       y += 2;
-      sumRow('Mano de obra', fmt(repair.laborCost));
-      if (partsTotal > 0) sumRow('Piezas', fmt(partsTotal));
-      doc.setDrawColor(200, 200, 200); doc.line(margin + 4, y + 2, pageW - margin - 4, y + 2); y += 4;
-      sumRow('TOTAL', fmt(total), true);
-      if (advance > 0) sumRow('Anticipo recibido', `- ${fmt(advance)}`);
-      doc.setDrawColor(200, 200, 200); doc.line(margin + 4, y + 2, pageW - margin - 4, y + 2); y += 4;
-      sumRow(pending > 0 ? 'SALDO PENDIENTE' : '✓ PAGADO', pending > 0 ? fmt(pending) : fmt(total), true);
-      y += 8;
 
-      // ── Garantía ───────────────────────────────────────────────────────────
+      // Caja de saldo (pendiente o liquidado)
+      {
+        const boxH = 13;
+        if (isPaid) {
+          fill(...TEAL_L); doc.rect(margin, y, contentW, boxH, 'F');
+          fill(...TEAL_M); doc.rect(margin, y, 2, boxH, 'F');
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); txt(...TEAL_D);
+          doc.text('LIQUIDADO', margin + 6, y + 8);
+          doc.setFontSize(16);
+          doc.text(fmt(0), pageW - margin - 4, y + 9, { align: 'right' });
+        } else {
+          fill(...WARN_BG); doc.rect(margin, y, contentW, boxH, 'F');
+          fill(...WARN_BD); doc.rect(margin, y, 2, boxH, 'F');
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); txt(...WARN_TX);
+          doc.text('SALDO PENDIENTE', margin + 6, y + 8);
+          doc.setFontSize(16);
+          doc.text(fmt(pending), pageW - margin - 4, y + 9, { align: 'right' });
+        }
+        y += boxH + 4;
+      }
+
+      sep();
+
+      // ══════════════════════════════════════════════════════════════════════
+      // SECCIÓN: GARANTÍA (si aplica)
+      // ══════════════════════════════════════════════════════════════════════
       const wType = repair.warrantyType ?? 'NONE';
       const wVoided = repair.warrantyVoided ?? false;
       if (wType !== 'NONE') {
-        y += 4;
-        doc.setFillColor(245, 245, 245); doc.rect(margin, y, contentW, 7, 'F');
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(80, 80, 80);
-        doc.text('GARANTÍA', margin + 3, y + 5); y += 11;
+        sLabel('Garantía');
 
         if (wVoided) {
-          doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(180, 50, 50);
-          doc.text('Garantía anulada — equipo alterado.', margin + 2, y);
-          y += 7;
+          fill(253, 240, 240); doc.rect(margin, y - 2, contentW, 14, 'F');
+          fill(...RED_TX);     doc.rect(margin, y - 2, 2, 14, 'F');
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); txt(...RED_TX);
+          doc.text('Garantía anulada', margin + 6, y + 3);
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); txt(...GR6);
+          doc.text(repair.warrantyVoided ? 'Equipo alterado después de la entrega.' : '', margin + 6, y + 8);
+          y += 16;
         } else {
           const totalDays = wType === 'DAYS_30' ? 30 : 60;
-          const deliveredDate = repair.deliveredAt ? new Date(repair.deliveredAt) : new Date();
-          const expiryDate = new Date(deliveredDate.getTime() + totalDays * 24 * 60 * 60 * 1000);
-          const expiryStr = expiryDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
-          const startStr = deliveredDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
+          const start = deliveryDate;
+          const expiry = new Date(start.getTime() + totalDays * 24 * 60 * 60 * 1000);
+          const fmtD = (d: Date) => d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
 
-          doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(30, 30, 30);
-          doc.text(`${totalDays} días naturales en mano de obra y piezas instaladas.`, margin + 2, y); y += 6;
-          doc.setFontSize(8); doc.setTextColor(100, 100, 100);
-          doc.text(`Inicio: ${startStr}   Vence: ${expiryStr}`, margin + 2, y); y += 7;
+          const boxH = 20;
+          fill(249, 250, 249); doc.rect(margin, y - 2, contentW, boxH, 'F');
+          fill(...TEAL_M);     doc.rect(margin, y - 2, 2, boxH, 'F');
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(9); txt(...GR6);
+          doc.text(`${totalDays} días naturales en mano de obra y piezas instaladas.`, margin + 6, y + 3);
+
+          doc.setFontSize(7.5); txt(...GR4);
+          doc.text('INICIO', margin + 6, y + 10);
+          doc.text('VENCE', margin + 40, y + 10);
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); txt(...GR9);
+          doc.text(fmtD(start), margin + 6, y + 15);
+          doc.text(fmtD(expiry), margin + 40, y + 15);
+          y += boxH + 2;
         }
+
+        sep();
       }
-      y += 4;
 
-      doc.setDrawColor(180, 180, 180);
-      doc.line(margin, y + 14, margin + 70, y + 14);
-      doc.setFontSize(7.5); doc.setTextColor(100, 100, 100);
-      doc.text('Firma de conformidad del cliente', margin, y + 19);
-      doc.text(repair.customer.name, margin, y + 23);
-      doc.line(pageW - margin - 70, y + 14, pageW - margin, y + 14);
-      doc.text('Entregado por (técnico)', pageW - margin - 70, y + 19);
+      // ══════════════════════════════════════════════════════════════════════
+      // SECCIÓN: FIRMAS
+      // ══════════════════════════════════════════════════════════════════════
+      sLabel('Firmas');
+      {
+        const sigW = (contentW - 8) / 2;
+        const sigH = 18;
+        const sigY = y;
 
-      doc.setFillColor(10, 10, 10); doc.rect(0, 285, pageW, 12, 'F');
-      doc.setFont('courier', 'bold'); doc.setFontSize(7); doc.setTextColor(251, 191, 36);
-      doc.text(repair.ticketNumber, margin, 291);
-      doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100);
-      doc.text(`Gracias por su preferencia — ${biz.name}`, pageW / 2, 291, { align: 'center' });
-      doc.text(`${new Date().toLocaleString('es-MX')}`, pageW - margin, 291, { align: 'right' });
+        // Firma del cliente (izquierda)
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); txt(...GR4);
+        doc.text('FIRMA DE CONFORMIDAD DEL CLIENTE', col1, sigY);
+        draw(...SEP); doc.setLineWidth(0.3);
+        doc.roundedRect(col1, sigY + 2, sigW, sigH, 1, 1, 'S');
+        doc.setFontSize(9); txt(...GR4);
+        doc.text(repair.customer.name, col1, sigY + sigH + 6);
+
+        // Firma del técnico (derecha)
+        const techX = col1 + sigW + 8;
+        doc.setFontSize(7.5); txt(...GR4);
+        doc.text('ENTREGADO POR (TÉCNICO)', techX, sigY);
+        draw(...SEP); doc.setLineWidth(0.3);
+        doc.roundedRect(techX, sigY + 2, sigW, sigH, 1, 1, 'S');
+
+        y += sigH + 10;
+      }
+
+      // ══════════════════════════════════════════════════════════════════════
+      // FOOTER
+      // ══════════════════════════════════════════════════════════════════════
+      const footerY = 282;
+      fill(...FT_BG); doc.rect(0, footerY, pageW, 15, 'F');
+      draw(...SEP); doc.setLineWidth(0.3);
+      doc.line(0, footerY, pageW, footerY);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); txt(...TEAL_D);
+      doc.text(repair.ticketNumber, margin, footerY + 8);
+      doc.setFont('helvetica', 'normal'); txt(...GRL);
+      doc.text(`Gracias por su preferencia — ${biz.name}`, pageW / 2, footerY + 8, { align: 'center' });
+      doc.text(`Generado: ${new Date().toLocaleString('es-MX')}`, pageW - margin, footerY + 8, { align: 'right' });
 
       window.open(doc.output('bloburl'), '_blank');
     } catch (err) { console.error(err); alert('Error al generar el ticket de entrega.'); }
