@@ -6,6 +6,7 @@ import { Users, Shield, Building2 } from 'lucide-react';
 import { NewUserForm } from './NewUserForm';
 import { UserList } from './UserList';
 import { BusinessSettingsForm } from './BusinessSettingsForm';
+import { BackupSection } from './BackupSection';
 import { getBusinessSettings } from '@/lib/businessSettings';
 
 export const dynamic = 'force-dynamic';
@@ -55,6 +56,8 @@ export default async function SettingsPage() {
           <NewUserForm />
         </div>
       </div>
+
+      <BackupSection />
     </div>
   );
 }

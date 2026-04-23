@@ -2,7 +2,6 @@ import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { formatCurrency } from '@/lib/utils';
 import { MobileHeader } from '@/components/MobileHeader';
-import { InventoryImportButton } from '@/components/InventoryImportButton';
 import { InventoryCategorySelect } from '@/components/InventoryCategorySelect';
 import { getSession } from '@/lib/auth';
 import { Plus, AlertTriangle, Download } from 'lucide-react';
@@ -45,12 +44,11 @@ export default async function InventoryPage({ searchParams }: { searchParams: { 
           </div>
           <div className="flex items-center gap-2">
             {isAdmin && (
-              <a href={exportHref} className="btn-secondary" title="Exportar a Excel (respeta filtros activos)">
+              <a href={exportHref} className="btn-secondary" title="Exportar vista actual a Excel (respeta filtros)">
                 <Download size={14} />
-                <span className="hidden sm:inline">Exportar</span>
+                <span className="hidden sm:inline">Exportar vista</span>
               </a>
             )}
-            {isAdmin && <InventoryImportButton />}
             <Link href="/inventory/new" className="btn-primary">
               <Plus size={15} />
               <span className="hidden sm:inline">Agregar pieza</span>
