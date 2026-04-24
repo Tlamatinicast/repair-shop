@@ -177,7 +177,7 @@ export function SaleReceiptButton({ sale, bizName }: { sale: SaleData; bizName: 
       doc.text('¡Gracias por su compra!', pageW / 2, y, { align: 'center' }); y += 4;
       doc.text(bizName, pageW / 2, y, { align: 'center' });
 
-      doc.save(`recibo-${sale.saleNumber}.pdf`);
+      window.open(doc.output('bloburl'), '_blank');
     } catch (err) {
       console.error(err);
       alert('Error al generar el recibo.');
