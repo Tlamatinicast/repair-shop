@@ -31,6 +31,7 @@ interface Repair {
   serviceType?: string;
   authorizedDiagnosis?: boolean;
   clientSignature?: string;
+  payments?: { amount: number; paymentMethod: string; createdAt: string }[];
   customer: {
     name: string;
     phone: string;
@@ -60,9 +61,11 @@ const CONTACT_LABELS: Record<string, string> = {
 interface BizInfo { name: string; phone: string; domain: string; }
 
 export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo }) {
-  const [loadingClient,   setLoadingClient]   = useState(false);
-  const [loadingInternal, setLoadingInternal] = useState(false);
-  const [loadingDelivery, setLoadingDelivery] = useState(false);
+  const [loadingClient,        setLoadingClient]        = useState(false);
+  const [loadingInternal,      setLoadingInternal]      = useState(false);
+  const [loadingDelivery,      setLoadingDelivery]      = useState(false);
+  const [loadingThermalEntry,  setLoadingThermalEntry]  = useState(false);
+  const [loadingThermalExit,   setLoadingThermalExit]   = useState(false);
 
   // ── CLIENT TICKET — estilo teal moderno ──────────────────────────────────
   const generateClientTicket = async () => {
@@ -713,14 +716,329 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
     finally { setLoadingInternal(false); }
   };
 
+  // ── TICKET TÉRMICO DE ENTRADA (80mm) ────────────────────────────────────
+  const generateThermalEntry = async () => {
+    setLoadingThermalEntry(true);
+    try {
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [80, 280] });
+      const pageW = 80; const m = 4; const cW = pageW - m * 2;
+
+      const accessories = JSON.parse(repair.accessories      || '[]') as string[];
+      const physCond    = JSON.parse(repair.physicalCondition || '[]') as string[];
+
+      doc.setFillColor(255, 255, 255); doc.rect(0, 0, pageW, 280, 'F');
+      let y = 6;
+
+      const line = () => {
+        doc.setDrawColor(180, 180, 180); doc.setLineWidth(0.3);
+        doc.line(m, y, pageW - m, y); y += 3;
+      };
+      const bold = (size: number) => { doc.setFont('helvetica', 'bold');   doc.setFontSize(size); doc.setTextColor(0, 0, 0); };
+      const norm = (size: number) => { doc.setFont('helvetica', 'normal'); doc.setFontSize(size); doc.setTextColor(40, 40, 40); };
+      const muted = (size: number) => { doc.setFont('helvetica', 'normal'); doc.setFontSize(size); doc.setTextColor(110, 110, 110); };
+      const secHeader = (text: string) => { bold(7); doc.text(text, m, y); y += 4.5; };
+      const kv = (label: string, value: string) => {
+        muted(6.5); doc.text(label, m, y);
+        norm(8); const lines = doc.splitTextToSize(value || '—', cW); doc.text(lines, m, y + 3.5);
+        y += 3.5 + lines.length * 3.8 + 1.5;
+      };
+
+      // Header
+      bold(11); doc.text(biz.name, pageW / 2, y, { align: 'center' }); y += 5;
+      muted(6.5); doc.text('Taller de Reparación de Dispositivos', pageW / 2, y, { align: 'center' }); y += 3.5;
+      const contact = [biz.phone, biz.domain].filter(Boolean).join(' · ');
+      if (contact) { doc.text(contact, pageW / 2, y, { align: 'center' }); y += 3.5; }
+      y += 1; line();
+
+      bold(8); doc.text('TICKET DE ENTRADA', pageW / 2, y, { align: 'center' }); y += 5;
+      line();
+
+      // Folio + fecha
+      bold(8); doc.text(repair.ticketNumber, m, y);
+      norm(7);
+      const fechaStr = new Date(repair.createdAt).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Mexico_City' });
+      const horaStr  = new Date(repair.createdAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Mexico_City' });
+      doc.text(`${fechaStr}  ${horaStr}`, pageW - m, y, { align: 'right' }); y += 4;
+      if (repair.dueDate) {
+        muted(6.5);
+        doc.text(`Entrega est.: ${new Date(repair.dueDate).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Mexico_City' })}`, m, y); y += 4;
+      }
+      line();
+
+      // Cliente
+      secHeader('CLIENTE');
+      kv('Nombre', repair.customer.name);
+      kv('Teléfono', repair.customer.phone);
+      if (repair.customer.email) kv('Correo', repair.customer.email);
+      if (repair.contactPreference) kv('Contactar por', CONTACT_LABELS[repair.contactPreference] || repair.contactPreference);
+      line();
+
+      // Dispositivo
+      secHeader('DISPOSITIVO');
+      kv('Tipo', repair.deviceType);
+      kv('Marca / Modelo', `${repair.deviceBrand} ${repair.deviceModel}`);
+      if (repair.serialNumber) kv('No. de serie', repair.serialNumber);
+      if (repair.password && repair.password !== 'N/A') kv('Contraseña', repair.password);
+      line();
+
+      // Accesorios
+      secHeader('ACCESORIOS ENTREGADOS');
+      if (accessories.length > 0) {
+        norm(7.5);
+        accessories.map(a => ACCESSORY_LABELS[a] || a).forEach(label => {
+          doc.text(`• ${label}`, m + 1, y); y += 4;
+        });
+      } else { muted(7.5); doc.text('Ninguno / N.A.', m + 1, y); y += 4; }
+      line();
+
+      // Condición física
+      secHeader('ESTADO FÍSICO AL RECIBIR');
+      norm(7.5);
+      const condText = physCond.map(pc => CONDITION_LABELS[pc] || pc).join(' · ') || 'Sin daños externos';
+      const condLines = doc.splitTextToSize(condText, cW); doc.text(condLines, m, y); y += condLines.length * 3.8 + 2;
+      if (repair.physicalNotes?.trim()) {
+        muted(7); const nLines = doc.splitTextToSize(repair.physicalNotes, cW); doc.text(nLines, m, y); y += nLines.length * 3.8 + 1;
+      }
+      line();
+
+      // Problema
+      secHeader('PROBLEMA REPORTADO');
+      norm(7.5);
+      const issLines = doc.splitTextToSize(repair.issue, cW); doc.text(issLines, m, y); y += issLines.length * 3.8 + 2;
+      if (repair.serviceType) {
+        const sLabel = SERVICE_LABELS[repair.serviceType] || repair.serviceType;
+        bold(7); doc.text(`Tipo: `, m, y); norm(7); doc.text(sLabel, m + doc.getTextWidth('Tipo: ') + 0.5, y); y += 4;
+      }
+      if (repair.authorizedDiagnosis) {
+        muted(6.5); doc.text('Autorizó diagnóstico y cargos adicionales', m, y); y += 4;
+      }
+      line();
+
+      // Costo estimado
+      secHeader('COSTO EST. MANO DE OBRA');
+      bold(10); doc.text(repair.laborCost > 0 ? fmt(repair.laborCost) : 'Por cotizar', m, y); y += 5;
+      muted(6.5); doc.text('Piezas pueden generar cargos adicionales.', m, y); y += 4;
+      line();
+
+      // Términos
+      secHeader('TÉRMINOS Y CONDICIONES');
+      muted(6.5);
+      [
+        'Tiempo estimado: 3–7 días hábiles, sujeto a disponibilidad de piezas.',
+        `${biz.name} no se responsabiliza por pérdida de datos. Respalde su información.`,
+        'Equipos no reclamados después de 30 días generarán cargo por almacenaje.',
+      ].forEach((term, i) => {
+        const tLines = doc.splitTextToSize(`${i + 1}. ${term}`, cW);
+        doc.text(tLines, m, y); y += tLines.length * 3.5 + 1.5;
+      });
+      line();
+
+      // Firma
+      secHeader('FIRMA DEL CLIENTE');
+      const sigH = 18;
+      doc.setFillColor(255, 255, 255); doc.rect(m, y, cW, sigH, 'F');
+      if (repair.clientSignature && repair.clientSignature.length > 50) {
+        try { doc.addImage(repair.clientSignature, 'PNG', m, y, cW, sigH); } catch {}
+      }
+      doc.setDrawColor(120, 120, 120); doc.setLineWidth(0.3);
+      doc.rect(m, y, cW, sigH);
+      y += sigH + 2;
+      norm(7.5); doc.text(repair.customer.name, m, y); y += 5;
+      line();
+
+      // Footer
+      bold(7); doc.text(repair.ticketNumber, m, y);
+      muted(6.5); doc.text('Conserve este comprobante para reclamar su equipo.', pageW / 2, y + 3.5, { align: 'center' });
+
+      window.open(doc.output('bloburl'), '_blank');
+    } catch (err) { console.error(err); alert('Error al generar el ticket térmico.'); }
+    finally { setLoadingThermalEntry(false); }
+  };
+
+  // ── TICKET TÉRMICO DE SALIDA (80mm) ─────────────────────────────────────
+  const generateThermalExit = async () => {
+    setLoadingThermalExit(true);
+    try {
+      const partsRes = await fetch(`/api/repairs/${repair.id}/parts`);
+      const parts: any[] = partsRes.ok ? await partsRes.json() : [];
+      const partsTotal = parts.reduce((s: number, p: any) => s + p.unitPrice * p.quantity, 0);
+      const total      = repair.laborCost + partsTotal;
+      const payments   = repair.payments ?? [];
+      const totalPaid  = payments.length > 0
+        ? payments.reduce((s, p) => s + p.amount, 0)
+        : (repair.advancePayment ?? 0);
+      const pending    = Math.max(0, total - totalPaid);
+      const isPaid     = pending <= 0 && total > 0;
+      const deliveryDate = repair.deliveredAt ? new Date(repair.deliveredAt) : new Date();
+
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [80, 260] });
+      const pageW = 80; const m = 4; const cW = pageW - m * 2;
+
+      doc.setFillColor(255, 255, 255); doc.rect(0, 0, pageW, 260, 'F');
+      let y = 6;
+
+      const line = () => {
+        doc.setDrawColor(180, 180, 180); doc.setLineWidth(0.3);
+        doc.line(m, y, pageW - m, y); y += 3;
+      };
+      const bold  = (size: number) => { doc.setFont('helvetica', 'bold');   doc.setFontSize(size); doc.setTextColor(0, 0, 0); };
+      const norm  = (size: number) => { doc.setFont('helvetica', 'normal'); doc.setFontSize(size); doc.setTextColor(40, 40, 40); };
+      const muted = (size: number) => { doc.setFont('helvetica', 'normal'); doc.setFontSize(size); doc.setTextColor(110, 110, 110); };
+      const PAYMENT_LABELS_T: Record<string, string> = { CASH: 'Efectivo', CARD: 'Tarjeta', TRANSFER: 'Transferencia', OTHER: 'Otro', UNKNOWN: 'N/E' };
+
+      // Header
+      bold(11); doc.text(biz.name, pageW / 2, y, { align: 'center' }); y += 5;
+      muted(6.5); doc.text('Taller de Reparación de Dispositivos', pageW / 2, y, { align: 'center' }); y += 3.5;
+      const contact = [biz.phone, biz.domain].filter(Boolean).join(' · ');
+      if (contact) { doc.text(contact, pageW / 2, y, { align: 'center' }); y += 3.5; }
+      y += 1; line();
+
+      // Título + estado
+      bold(8); doc.text('TICKET DE SALIDA', pageW / 2, y, { align: 'center' }); y += 4.5;
+      bold(7); const statusTxt = isPaid ? '✓ LIQUIDADO' : '⚠ SALDO PENDIENTE';
+      doc.text(statusTxt, pageW / 2, y, { align: 'center' }); y += 4;
+      line();
+
+      // Folio + fecha
+      bold(8); doc.text(repair.ticketNumber, m, y);
+      norm(7);
+      const fechaStr = deliveryDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Mexico_City' });
+      doc.text(fechaStr, pageW - m, y, { align: 'right' }); y += 5;
+      line();
+
+      // Cliente
+      bold(7); doc.text('CLIENTE', m, y); y += 4;
+      bold(8); doc.text(repair.customer.name, m, y); y += 4;
+      norm(7.5); doc.text(repair.customer.phone, m, y); y += 4;
+      line();
+
+      // Dispositivo
+      bold(7); doc.text('DISPOSITIVO', m, y); y += 4;
+      norm(8); doc.text(`${repair.deviceType}  ·  ${repair.deviceBrand} ${repair.deviceModel}`, m, y); y += 4;
+      if (repair.serialNumber) { muted(6.5); doc.text(`N/S: ${repair.serialNumber}`, m, y); y += 3.5; }
+      line();
+
+      // Piezas
+      if (parts.length > 0) {
+        bold(7); doc.text('PIEZAS UTILIZADAS', m, y); y += 4;
+        parts.forEach(p => {
+          norm(7.5);
+          const name = p.item?.name ?? 'Pieza';
+          const nameLines = doc.splitTextToSize(`${p.quantity}× ${name}`, cW - 18);
+          doc.text(nameLines, m, y);
+          bold(7.5); doc.text(fmt(p.unitPrice * p.quantity), pageW - m, y, { align: 'right' });
+          doc.setFont('helvetica', 'normal');
+          y += nameLines.length * 3.8 + 1.5;
+        });
+        line();
+      }
+
+      // Resumen de cobro
+      bold(7); doc.text('RESUMEN DE COBRO', m, y); y += 4.5;
+      const cobroRow = (label: string, value: string, isBold = false) => {
+        if (isBold) bold(8); else norm(7.5);
+        doc.text(label, m, y);
+        if (isBold) bold(8); else norm(7.5);
+        doc.text(value, pageW - m, y, { align: 'right' }); y += 4.5;
+      };
+      cobroRow('Mano de obra', fmt(repair.laborCost));
+      if (partsTotal > 0) cobroRow('Piezas', fmt(partsTotal));
+      doc.setDrawColor(100, 100, 100); doc.setLineWidth(0.4);
+      doc.line(m, y, pageW - m, y); y += 3;
+      cobroRow('TOTAL', fmt(total), true);
+      y += 1;
+
+      // Cobros / saldo
+      if (payments.length > 0) {
+        muted(6.5); doc.text('COBROS REGISTRADOS', m, y); y += 4;
+        payments.forEach(p => {
+          const pFecha = new Date(p.createdAt).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', timeZone: 'America/Mexico_City' });
+          norm(7);
+          doc.text(`+ ${fmt(p.amount)}  ${PAYMENT_LABELS_T[p.paymentMethod] ?? p.paymentMethod}`, m, y);
+          muted(6.5); doc.text(pFecha, pageW - m, y, { align: 'right' }); y += 4;
+        });
+        doc.setDrawColor(140, 140, 140); doc.setLineWidth(0.3); doc.line(m, y, pageW - m, y); y += 3;
+      } else if (totalPaid > 0) {
+        norm(7.5); doc.text('Anticipo recibido', m, y);
+        doc.text(fmt(totalPaid), pageW - m, y, { align: 'right' }); y += 4.5;
+      }
+
+      bold(9);
+      if (isPaid) {
+        doc.text('LIQUIDADO', m, y); doc.text(fmt(0), pageW - m, y, { align: 'right' });
+      } else {
+        doc.text('SALDO PENDIENTE', m, y); doc.text(fmt(pending), pageW - m, y, { align: 'right' });
+      }
+      y += 6;
+      line();
+
+      // Garantía
+      const wType   = repair.warrantyType ?? 'NONE';
+      const wVoided = repair.warrantyVoided ?? false;
+      if (wType !== 'NONE') {
+        bold(7); doc.text('GARANTÍA', m, y); y += 4;
+        if (wVoided) {
+          bold(7.5); doc.setTextColor(160, 0, 0); doc.text('Garantía anulada (equipo alterado)', m, y); y += 4;
+          doc.setTextColor(0, 0, 0);
+        } else {
+          const totalDays = wType === 'DAYS_30' ? 30 : 60;
+          const expiry    = new Date(deliveryDate.getTime() + totalDays * 24 * 60 * 60 * 1000);
+          const fmtD = (d: Date) => d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Mexico_City' });
+          norm(7.5); doc.text(`${totalDays} días naturales en mano de obra y piezas.`, m, y); y += 4;
+          muted(6.5);
+          doc.text(`Inicio: ${fmtD(deliveryDate)}`, m, y);
+          doc.text(`Vence: ${fmtD(expiry)}`, pageW - m, y, { align: 'right' }); y += 4;
+        }
+        line();
+      }
+
+      // Firmas
+      bold(7); doc.text('FIRMAS', m, y); y += 4;
+      const sigW = (cW - 4) / 2;
+      const sigH = 16;
+
+      muted(6); doc.text('CONFORMIDAD DEL CLIENTE', m, y);
+      doc.text('ENTREGADO POR (TÉCNICO)', m + sigW + 4, y); y += 2;
+
+      doc.setFillColor(255, 255, 255);
+      doc.rect(m, y, sigW, sigH, 'F');
+      doc.rect(m + sigW + 4, y, sigW, sigH, 'F');
+      doc.setDrawColor(120, 120, 120); doc.setLineWidth(0.3);
+      doc.rect(m, y, sigW, sigH);
+      doc.rect(m + sigW + 4, y, sigW, sigH);
+      y += sigH + 2;
+
+      norm(7); doc.text(repair.customer.name, m, y); y += 6;
+      line();
+
+      // Footer
+      bold(7); doc.text(repair.ticketNumber, m, y);
+      muted(6.5); doc.text(`Gracias por su preferencia — ${biz.name}`, pageW / 2, y + 3.5, { align: 'center' });
+
+      window.open(doc.output('bloburl'), '_blank');
+    } catch (err) { console.error(err); alert('Error al generar el ticket térmico.'); }
+    finally { setLoadingThermalExit(false); }
+  };
+
   return (
     <div className="flex flex-col gap-2">
-      <button onClick={generateClientTicket} disabled={loadingClient} className="btn-primary w-full justify-center disabled:opacity-50">
-        {loadingClient ? <><Loader2 size={14} className="animate-spin" /> Generando...</> : <><Printer size={14} /> Ticket entrada (A4)</>}
+      <button onClick={generateThermalEntry} disabled={loadingThermalEntry} className="btn-primary w-full justify-center disabled:opacity-50">
+        {loadingThermalEntry ? <><Loader2 size={14} className="animate-spin" /> Generando...</> : <><Printer size={14} /> Ticket de entrada (80mm)</>}
       </button>
-      <button onClick={generateDeliveryTicket} disabled={loadingDelivery} className="btn-primary w-full justify-center disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #065f46, #047857)' }}>
-        {loadingDelivery ? <><Loader2 size={14} className="animate-spin" /> Generando...</> : <><FileCheck size={14} /> Ticket entrega (A4)</>}
+      <button onClick={generateThermalExit} disabled={loadingThermalExit} className="btn-primary w-full justify-center disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #065f46, #047857)' }}>
+        {loadingThermalExit ? <><Loader2 size={14} className="animate-spin" /> Generando...</> : <><FileCheck size={14} /> Ticket de salida (80mm)</>}
       </button>
+      <div className="border-t border-[#1a1a1a] pt-2 flex flex-col gap-2">
+        <p className="text-[10px] text-[#444] font-mono uppercase tracking-wide">Formato A4</p>
+        <button onClick={generateClientTicket} disabled={loadingClient} className="btn-secondary w-full justify-center disabled:opacity-50">
+          {loadingClient ? <><Loader2 size={14} className="animate-spin" /> Generando...</> : <><Printer size={14} /> Nota de entrada</>}
+        </button>
+        <button onClick={generateDeliveryTicket} disabled={loadingDelivery} className="btn-secondary w-full justify-center disabled:opacity-50">
+          {loadingDelivery ? <><Loader2 size={14} className="animate-spin" /> Generando...</> : <><FileCheck size={14} /> Nota de salida</>}
+        </button>
+      </div>
       <button onClick={generateInternalTicket} disabled={loadingInternal} className="btn-secondary w-full justify-center disabled:opacity-50">
         {loadingInternal ? <><Loader2 size={14} className="animate-spin" /> Generando...</> : <><Tag size={14} /> Etiqueta interna + QR</>}
       </button>

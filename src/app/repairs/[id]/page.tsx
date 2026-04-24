@@ -179,6 +179,7 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                   deliveredAt: repair.deliveredAt?.toISOString() ?? null,
                   warrantyType: (repair as any).warrantyType ?? 'NONE',
                   warrantyVoided: (repair as any).warrantyVoided ?? false,
+                  payments: ((repair as any).payments ?? []).map((p: any) => ({ amount: p.amount, paymentMethod: p.paymentMethod, createdAt: p.createdAt.toISOString() })),
                   customer: {
                     name: repair.customer.name,
                     phone: repair.customer.phone,
