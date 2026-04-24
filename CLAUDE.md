@@ -111,6 +111,7 @@ src/
 - **Ticket de salida rediseñado** — paleta teal (igual que ticket de entrada), header con badge PAGADO/SALDO PENDIENTE, tabla de piezas, resumen de cobro con caja destacada, sección de garantía con borde lateral, cajas de firma rectangulares, footer verde. Commit `f2a8d2e`.
 - **Timezone fijo en helpers de fecha/hora** — `src/lib/utils.ts` tiene `MX_TZ = 'America/Mexico_City'`. `formatDate` corregido, nuevos helpers `formatTime`, `formatDateTime`, `formatDateLong`. Usar **siempre estos helpers** en server components — Railway corre en UTC y sin `timeZone` los timestamps salen 6h desfasados. Los PDFs generados con jsPDF en el browser ya usan la zona local automáticamente.
 - **Recibo de venta con desglose de cobros** — `SaleReceiptButton` recibe `payments`, `amountPaid`, `paymentStatus`. PDF muestra sección "COBROS" con cada abono (monto + método + fecha/hora), total pagado y "SALDO PENDIENTE" en naranja si aplica. Venta liquidada con un pago: línea simple `Pagado · Efectivo`. PDF abre en pestaña nueva (`window.open(doc.output('bloburl'), '_blank')`) en vez de descargarse — igual que tickets de reparación.
+- **Tickets térmicos 80mm para reparaciones** — `TicketButtons.tsx` tiene `generateThermalEntry` y `generateThermalExit` (formato `[80, 280]` y `[80, 260]`, m=4mm). Entrada: folio+hora, cliente, dispositivo, accesorios, condición física, problema, costo estimado, términos, firma con fondo blanco explícito (`doc.rect FD` antes de `addImage`). Salida: cliente, dispositivo, desglose de piezas (fetch `/api/repairs/[id]/parts`), resumen de cobro, historial `RepairPayment` (prop `payments[]` pasado desde `page.tsx`), garantía, cajas de firma cliente+técnico. Botones A4 renombrados a "Nota de entrada" / "Nota de salida", agrupados bajo separador. Botones principales: "Ticket de entrada (80mm)" / "Ticket de salida (80mm)". Impresión térmica ya funciona — pendiente solo etiqueta con sticker (sin impresora aún).
 
 ---
 
@@ -147,9 +148,9 @@ src/
 
 ## Estado actual al 2026-04-23 (cierre de sesión)
 
-**Último commit en `main`:** `696437d Recibo de venta: abrir en pestaña nueva en vez de descargar`
+**Último commit en `main`:** `a23a205 Tickets termicos 80mm de entrada y salida para reparaciones`
 
-**Sesión cerró con:** backup de clientes funcionando, ventas independientes de órdenes, ticket de salida rediseñado, fix timezone en helpers de fecha/hora, recibo de venta con desglose de cobros + abre en pestaña nueva. Todo validado en producción.
+**Sesión cerró con:** backup clientes, fix timezone, recibo venta con cobros, tickets térmicos 80mm de entrada y salida validados en producción. Impresión térmica funcionando. Pendiente: impresora de etiquetas para stickers QR (Tlami aún no decide cuál comprar).
 
 **En producción:** https://repair-shop-production-c450.up.railway.app  
 **Credenciales demo:** admin@repaiross.com / admin123 · tecnico@repaiross.com / tecnico123
