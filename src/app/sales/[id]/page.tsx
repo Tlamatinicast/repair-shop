@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate, formatTime } from '@/lib/utils';
 import { MobileHeader } from '@/components/MobileHeader';
 import { ArrowLeft, ShoppingBag, ExternalLink, CreditCard, CheckCircle2, Clock } from 'lucide-react';
 import { SaleReceiptButton } from './SaleReceiptButton';
@@ -112,7 +112,7 @@ export default async function SaleDetailPage({ params }: { params: { id: string 
                           </span>
                         </div>
                         <p className="text-[11px] text-[#555] mt-0.5">
-                          {formatDate(p.createdAt)} · {new Date(p.createdAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+                          {formatDate(p.createdAt)} · {formatTime(p.createdAt)}
                         </p>
                         {p.notes && <p className="text-xs text-[#666] mt-0.5 italic">{p.notes}</p>}
                       </div>
@@ -141,7 +141,7 @@ export default async function SaleDetailPage({ params }: { params: { id: string 
               <div className="space-y-2">
                 <Row label="Folio" value={sale.saleNumber} mono />
                 <Row label="Fecha" value={formatDate(sale.createdAt)} />
-                <Row label="Hora" value={new Date(sale.createdAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })} mono />
+                <Row label="Hora" value={formatTime(sale.createdAt)} mono />
                 {(sale as any).payments?.[0] && (
                   <Row label="Método inicial" value={PAYMENT_LABELS[(sale as any).payments[0].paymentMethod] ?? (sale as any).payments[0].paymentMethod} />
                 )}
@@ -203,6 +203,9 @@ export default async function SaleDetailPage({ params }: { params: { id: string 
                   notes: sale.notes,
                   customer: sale.customer ? { name: sale.customer.name, phone: sale.customer.phone } : null,
                   items: sale.items.map(i => ({ name: i.name, quantity: i.quantity, unitPrice: i.unitPrice, subtotal: i.subtotal })),
+                  payments: ((sale as any).payments ?? []).map((p: any) => ({ amount: p.amount, paymentMethod: p.paymentMethod, createdAt: p.createdAt.toISOString() })),
+                  amountPaid: sale.amountPaid,
+                  paymentStatus: sale.paymentStatus,
                 }}
               />
               {remaining > 0 && (

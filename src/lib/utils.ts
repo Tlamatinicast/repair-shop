@@ -34,8 +34,25 @@ export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount);
 }
 
+// Timezone fijo America/Mexico_City (UTC-6) porque MX ya no usa horario de verano desde 2022.
+// Usar estos helpers en todos lados en vez de toLocale* directo — el server en Railway corre en UTC
+// y sin timeZone los timestamps salen desfasados ~6h.
+const MX_TZ = 'America/Mexico_City';
+
 export function formatDate(date: string | Date): string {
-  return new Intl.DateTimeFormat('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(date));
+  return new Intl.DateTimeFormat('es-MX', { timeZone: MX_TZ, day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(date));
+}
+
+export function formatTime(date: string | Date): string {
+  return new Intl.DateTimeFormat('es-MX', { timeZone: MX_TZ, hour: '2-digit', minute: '2-digit' }).format(new Date(date));
+}
+
+export function formatDateTime(date: string | Date): string {
+  return new Intl.DateTimeFormat('es-MX', { timeZone: MX_TZ, day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(date));
+}
+
+export function formatDateLong(date: string | Date): string {
+  return new Intl.DateTimeFormat('es-MX', { timeZone: MX_TZ, day: '2-digit', month: 'long', year: 'numeric' }).format(new Date(date));
 }
 
 export function generateTicketNumber(id: number): string {

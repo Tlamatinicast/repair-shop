@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate, formatTime } from '@/lib/utils';
 import { MobileHeader } from '@/components/MobileHeader';
 import { DateFilter } from './DateFilter';
 import { Plus, ShoppingBag, TrendingUp, CreditCard, Banknote, ArrowLeftRight } from 'lucide-react';
@@ -102,7 +102,7 @@ export default async function SalesPage({ searchParams }: { searchParams: { date
                   </td>
                   <td className="px-4 py-3 font-mono text-sm text-amber-400 font-medium">{formatCurrency(s.total)}</td>
                   <td className="px-4 py-3 text-xs text-[#555] font-mono">
-                    {new Date(s.createdAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+                    {formatTime(s.createdAt)}
                   </td>
                   <td className="px-4 py-3">
                     <Link href={`/sales/${s.id}`} className="text-xs text-[#555] hover:text-amber-400 font-mono transition-colors">ver</Link>
