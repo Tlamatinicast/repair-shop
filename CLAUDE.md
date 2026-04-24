@@ -106,6 +106,11 @@ src/
 - **Importador + exportador de inventario Excel** — UI inline en /inventory ("Exportar vista" respeta filtros activos `?q=&category=`). Backup completo + restauración viven en `/settings → Backup y restauración` (`src/app/settings/BackupSection.tsx`, con placeholders para Clientes/Reparaciones/Ventas). Importador soporta modos `create` (default) y `upsert` (sobrescribe existentes — para restaurar backup). Normalización hardcoded de categorías en `src/lib/inventoryImport.ts → CATEGORY_NORMALIZATION`. `INVENTORY_CATEGORIES` en `src/lib/utils.ts` ya tiene las 24 categorías reales. Default global de `minQuantity` ahora es `2`.
 - **Pagos de reparaciones por evento (`RepairPayment`)** — espejo de `SalePayment`. Cada pago tiene amount + paymentMethod (CASH/CARD/TRANSFER/OTHER/UNKNOWN) + notes + createdAt. UI en `RepairWorkspace.tsx` reemplazó la edición directa del anticipo por: lista de pagos + botón "Agregar pago" (radios de método) + "Cobrar saldo" (precarga restante) + botón anular admin. `Repair.advancePayment` queda como total denormalizado.
 - **Corte de caja** (`/corte-de-caja`, admin only) — presets Hoy/Ayer/Esta semana/Este mes + rango custom. Cards: Total recaudado, Ventas POS, Cobros reparaciones, # transacciones. Desglose por método con barras. Lista cronológica de movimientos (union SalePayment + RepairPayment). Helper de conciliación de efectivo (input físico vs registrado, no persiste). Export a .xlsx con dos hojas (Resumen + Movimientos) vía `GET /api/cash-close/export`. Item nuevo en Sidebar y BottomNav (admin only).
+- **Backup de Clientes** — `GET /api/customers/export` + `POST /api/customers/import` (modos create/upsert). Llave natural de upsert: `phone` (no es `@unique`, upsert manual con `findFirst` + `update`/`create` en transacción). Parser en `src/lib/customerImport.ts`, botón en `src/components/CustomerImportButton.tsx`. Encabezados Excel en español: `Nombre, Teléfono, Correo, Dirección, Notas`. Fila "Clientes" activa en `BackupSection.tsx`.
+- **Ventas independientes de órdenes** — cada venta con `repairId` es creada desde POS (`/sales/new`), tiene su propio ticket y cobro, y NO suma al `totalCost` de la orden. `RepairWorkspace.tsx` sección "Productos vendidos" es read-only (lista + link a `/sales/new?customerId=X&repairId=Y`). Fix: piezas usan `salePrice` no `costPrice` al seleccionar del inventario. `/api/sales` POST ya no recalcula `totalCost`.
+- **Ticket de salida rediseñado** — paleta teal (igual que ticket de entrada), header con badge PAGADO/SALDO PENDIENTE, tabla de piezas, resumen de cobro con caja destacada, sección de garantía con borde lateral, cajas de firma rectangulares, footer verde. Commit `f2a8d2e`.
+- **Timezone fijo en helpers de fecha/hora** — `src/lib/utils.ts` tiene `MX_TZ = 'America/Mexico_City'`. `formatDate` corregido, nuevos helpers `formatTime`, `formatDateTime`, `formatDateLong`. Usar **siempre estos helpers** en server components — Railway corre en UTC y sin `timeZone` los timestamps salen 6h desfasados. Los PDFs generados con jsPDF en el browser ya usan la zona local automáticamente.
+- **Recibo de venta con desglose de cobros** — `SaleReceiptButton` recibe `payments`, `amountPaid`, `paymentStatus`. PDF muestra sección "COBROS" con cada abono (monto + método + fecha/hora), total pagado y "SALDO PENDIENTE" en naranja si aplica. Venta liquidada con un pago: línea simple `Pagado · Efectivo`. PDF abre en pestaña nueva (`window.open(doc.output('bloburl'), '_blank')`) en vez de descargarse — igual que tickets de reparación.
 
 ---
 
@@ -135,49 +140,37 @@ src/
 18. **Timezone para corte de caja:** todo el cálculo de fechas en `src/lib/cashClose.ts` usa **America/Mexico_City (UTC-6 fijo)** porque MX ya no usa horario de verano desde 2022. Usar `rangeForPreset()` y `parseDateOrNull()` — no `new Date()` directo.
 19. **xlsx + NextResponse:** `XLSX.write(wb, { type: 'buffer' })` devuelve `Buffer`, que TS no acepta como BodyInit. Envolver en `new Uint8Array(buffer)` antes de pasar a `NextResponse`.
 20. **`exportHref` con filtros activos:** patrón ya usado en /inventory — construir `URLSearchParams` desde los `searchParams` de la página y pasarlo a un `<a href>` plano (no `<Link>`, para que el browser descargue sin interceptar).
+21. **Timezone en helpers de utils.ts:** NUNCA usar `toLocaleTimeString`/`toLocaleString` directo en server components — Railway corre en UTC. Siempre usar `formatDate()`, `formatTime()`, `formatDateTime()` de `@/lib/utils` que fuerzan `timeZone: 'America/Mexico_City'`. Los PDFs con jsPDF sí pueden usar `toLocaleString` porque corren en el browser del usuario.
+22. **PDFs que abren en pestaña nueva:** usar `window.open(doc.output('bloburl'), '_blank')` en vez de `doc.save(filename)` — permite imprimir con Ctrl+P sin descargar el archivo. Patrón ya aplicado en `TicketButtons.tsx` y `SaleReceiptButton.tsx`.
 
 ---
 
-## Estado actual al 2026-04-22 (cierre de sesión)
+## Estado actual al 2026-04-23 (cierre de sesión)
 
-**Último commit en `main`:** `b9b4960 Corte de caja v1 + RepairPayment con metodo`
+**Último commit en `main`:** `696437d Recibo de venta: abrir en pestaña nueva en vez de descargar`
 
-**Sesión cerró con:** importador + exportador de inventario funcionando en producción, RepairPayment migrado con backfill, UI de pagos de reparación rediseñada, módulo Corte de caja v1 desplegado, item nuevo en sidebar/bottom-nav. Tlami validó cada pieza en producción.
+**Sesión cerró con:** backup de clientes funcionando, ventas independientes de órdenes, ticket de salida rediseñado, fix timezone en helpers de fecha/hora, recibo de venta con desglose de cobros + abre en pestaña nueva. Todo validado en producción.
 
 **En producción:** https://repair-shop-production-c450.up.railway.app  
 **Credenciales demo:** admin@repaiross.com / admin123 · tecnico@repaiross.com / tecnico123
 
 ---
 
-## 🔜 Próximo trabajo acordado — Backup de Clientes (sesión 2026-04-23)
+## Pendientes futuros
 
-**Objetivo:** replicar el patrón de export/import de Inventario al módulo de Clientes. Es el más simple porque la tabla `Customer` es plana (sin relaciones internas que importen para round-trip).
+- **Reset de DB demo** — diferido. Se ejecutará cuando Tlami lance la app para uso real. Decidir si conservar usuarios Admin/Technician o borrar todo.
+- **6 items en BottomNav para admin** — vigilar si en el celular se ve apretado; si sí, mover Corte de caja solo a sidebar+settings y dejar bottom-nav con los 5 operativos.
+- **Pagos históricos con método UNKNOWN** — los anticipos previos al 2026-04-22 quedaron como "No especificado" en el corte. Ruido aceptable; se diluye conforme entran pagos nuevos.
+- **Export-only para reportes operativos de Reparaciones/Ventas** — pendiente, decidir cuándo se necesite.
+- **Cierre de caja persistente (v2)** — registros históricos `CashClose` con snapshot y conteo físico. Diferido hasta validar v1 con uso real.
+- **`pg_dump` automatizado vía GitHub Action** — para backup de producción cuando la app pase a uso real en campo.
+- **Impresión térmica** — Tlami tiene impresora 80mm con autocorte + impresora carta. Quiere tickets en ambos formatos. Para stickers QR aún no tiene impresora de etiquetas.
+- **Dominio propio** — comprar en Cloudflare (~MX$200/año) y apuntar a Railway cuando Tlami quiera.
 
-### Plan
+### Decisiones arquitectónicas fijas
 
-1. **`GET /api/customers/export` (admin)** — .xlsx round-trip respetando query params del filtro (si los hay en /customers). Columnas mínimas: `Name | Phone | Email | Address | Notes` + cualquier otro campo del modelo `Customer`. Filename: `clientes-{businessSlug}-{YYYY-MM-DD}.xlsx`.
-2. **`POST /api/customers/import` (admin, multipart, dryRun + transacción)** — modos `create` y `upsert`. ¿Por qué columna se hace el upsert? Probablemente `phone` (es lo más cercano a un identificador natural). Confirmar con Tlami antes.
-3. **Activar fila "Clientes" en `src/app/settings/BackupSection.tsx`** — cambiar `exportHref: null` por la URL real y `importControl: null` por un componente análogo a `InventoryImportButton`.
-4. **Decisión pendiente:** ¿el botón "Exportar" inline también va en `/customers` o solo el backup completo en /settings? Aplicar la regla: si hay un caso de uso real de "exportar lo que estoy filtrando", va inline. Si no, solo backup.
-
-### Decisión ya tomada — NO hacer round-trip Excel para Reparaciones / Ventas
-
-Para "backup real" de Reparaciones y Ventas, depender de los **snapshots automáticos de Postgres en Railway** (esos son el verdadero backup, ya nativos). Razón: estos modelos tienen tablas relacionadas (RepairPart, RepairPhoto, RepairNote, SaleItem, RepairPayment, SalePayment) que no caben en una hoja plana sin perder datos, y el restore desde multi-hoja es propenso a bugs por re-mapeo de FK.
-
-Para reportes, el **Corte de caja** ya cubre el ángulo financiero. Si más adelante hace falta export operativo (lista de reparaciones del mes para el contador, ventas por técnico, etc.), agregar **export-only** en cada página correspondiente. Marcar las filas de Reparaciones/Ventas en `BackupSection.tsx` con texto que aclare que NO son backups completos sino reportes.
-
-### Otros pendientes futuros
-
-- **Reset de DB demo** — diferido. Se ejecutará cuando Tlami "lance" la página para uso definitivo. Falta decidir si conservar usuarios Admin/Technician o borrar todo.
-- **6 items en BottomNav para admin** — vigilar si en el celular de Tlami se ve apretado tras agregar Corte de caja; si sí, considerar mover Corte solo a sidebar+settings y dejar bottom-nav solo con los 5 operativos.
-- **Pagos históricos con método UNKNOWN** — los anticipos previos al 2026-04-22 quedaron como "No especificado" en el corte de caja porque el backfill no podía saber el método original. Es ruido aceptable; con el tiempo se diluye conforme entran pagos nuevos con método registrado.
-
-### Decisiones de infraestructura tomadas (contexto, no urgentes)
-
-- **Hosting:** quedarse en Railway. Los planes de Hostinger compartido (Single/Premium/Business/Cloud Startup) **no sirven** para Next.js/Prisma — son para WordPress. Hostinger VPS sería peor que Railway.
-- **Dominio propio:** cuando Tlami quiera, comprar en **Cloudflare** (~MX$200/año) y apuntar a Railway. Sin urgencia.
-- **Correo con dominio propio:** empezar con **Cloudflare Email Routing** gratis (reenvío a Gmail personal); migrar a Google Workspace solo cuando haya 2-3 empleados con buzones separados.
-- **Impresión térmica (roadmap futuro):** Tlami ya tiene impresora térmica **80mm genérica con autocorte** + impresora normal tamaño carta. Quiere tickets de entrada y salida imprimibles en ambas. Para stickers con QR aún no tiene impresora de etiquetas; decisión de compra pendiente.
+- **Reparaciones y Ventas NO tienen round-trip Excel** — datos relacionales (RepairPart, RepairPhoto, SaleItem, etc.) no caben en hoja plana. Backup real = `pg_dump`. Corte de caja cubre el ángulo financiero.
+- **Hosting:** Railway. Hostinger compartido no sirve para Next.js/Prisma.
 
 ### Schema actual — modelo Setting
 
@@ -204,7 +197,7 @@ Keys usadas: `businessName`, `businessPhone`, `businessDomain`
 - **Paleta:** fondo negro (`#000–#111`), acentos en `amber-400/500`, textos en escalas de gris.
 - **Componentes base:** `card`, `btn-primary`, `btn-secondary`, `btn-ghost`, `section-title`, `input`, `select`, `label`, `badge`.
 - **Iconos:** `lucide-react` (tamaños 12–15).
-- **Moneda:** `formatCurrency()` · **Fechas:** `formatDate()` — ambos en `@/lib/utils`.
+- **Moneda:** `formatCurrency()` · **Fechas/horas:** `formatDate()`, `formatTime()`, `formatDateTime()` — todos en `@/lib/utils`, con timezone `America/Mexico_City` forzado.
 - **Layout:** `MobileHeader` + `BottomNav` en mobile; `Sidebar` fijo en desktop.
 - **Nombre del negocio en componentes cliente:** leer del contexto `useBusinessSettings()` de `@/components/BusinessSettingsContext`. En server components: usar `getBusinessSettings()` de `@/lib/businessSettings`.
 
@@ -234,7 +227,7 @@ Keys usadas: `businessName`, `businessPhone`, `businessDomain`
 - [x] Sección de backup centralizada en /settings (placeholders para módulos restantes)
 - [x] Pagos de reparación con método (RepairPayment + UI rediseñada)
 - [x] Corte de caja v1 (vista en vivo con desglose por método y conciliación)
-- [ ] Backup de Clientes (siguiente — 2026-04-23)
+- [x] Backup de Clientes — export/import Excel por teléfono como llave natural
 - [ ] Export-only para reportes operativos de Reparaciones/Ventas (pendiente, decidir cuándo se necesite)
 - [ ] DB limpia sin datos demo para producción
 - [ ] Expansión de `deviceType` para módulos vehiculares y dispositivos médicos
