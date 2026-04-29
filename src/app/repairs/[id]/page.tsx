@@ -136,6 +136,7 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
             <RepairWorkspace
               repairId={repair.id}
               diagnosisFee={(repair as any).diagnosisFee ?? 0}
+              repairStatus={repair.status}
               customerId={repair.customerId}
               initialParts={repair.parts.map(p => ({
                 id: p.id, itemId: p.itemId, quantity: p.quantity,
