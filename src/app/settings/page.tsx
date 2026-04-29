@@ -2,11 +2,12 @@ import { requireAdmin } from '@/lib/auth';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
 import { prisma } from '@/lib/prisma';
-import { Users, Shield, Building2 } from 'lucide-react';
+import { Users, Shield, Building2, FileText } from 'lucide-react';
 import { NewUserForm } from './NewUserForm';
 import { UserList } from './UserList';
 import { BusinessSettingsForm } from './BusinessSettingsForm';
 import { BackupSection } from './BackupSection';
+import { QuoteSettingsForm } from './QuoteSettingsForm';
 import { getBusinessSettings } from '@/lib/businessSettings';
 
 export const dynamic = 'force-dynamic';
@@ -16,13 +17,15 @@ export default async function SettingsPage() {
   const session = await getServerSession(authOptions);
   const currentUserId = (session?.user as any)?.id ?? 0;
 
-  const [users, biz] = await Promise.all([
+  const [users, biz, quoteSettings] = await Promise.all([
     prisma.user.findMany({
       select: { id: true, name: true, email: true, role: true, active: true, createdAt: true },
       orderBy: { createdAt: 'asc' },
     }),
     getBusinessSettings(),
+    prisma.setting.findMany({ where: { key: { in: ['quoteTerms', 'quoteValidityDays'] } } }),
   ]);
+  const quoteMap = Object.fromEntries(quoteSettings.map(s => [s.key, s.value]));
 
   return (
     <div className="p-6 max-w-3xl mx-auto animate-in">
@@ -55,6 +58,17 @@ export default async function SettingsPage() {
           </div>
           <NewUserForm />
         </div>
+      </div>
+
+      <div className="card p-5 mb-5">
+        <div className="flex items-center gap-2 mb-5 pb-3 border-b border-[#1a1a1a]">
+          <FileText size={14} className="text-amber-500" />
+          <h2 className="text-sm font-semibold text-[#ccc]">Cotizaciones</h2>
+        </div>
+        <QuoteSettingsForm
+          defaultTerms={quoteMap['quoteTerms'] ?? ''}
+          defaultValidityDays={Number(quoteMap['quoteValidityDays'] ?? 30)}
+        />
       </div>
 
       <BackupSection />

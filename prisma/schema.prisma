@@ -16,6 +16,7 @@ model Customer {
   notes     String?
   repairs   Repair[]
   sales     Sale[]
+  quotes    Quote[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -191,4 +192,39 @@ model User {
 model Setting {
   key   String @id
   value String
+}
+
+model Quote {
+  id            Int         @id @default(autoincrement())
+  quoteNumber   String      @unique
+  status        String      @default("DRAFT")
+  customer      Customer?   @relation(fields: [customerId], references: [id])
+  customerId    Int?
+  customerName  String      @default("")
+  customerPhone String      @default("")
+  items         QuoteItem[]
+  subtotal      Float       @default(0)
+  discount      Float       @default(0)
+  ivaAmount     Float       @default(0)
+  total         Float       @default(0)
+  deposit       Float       @default(0)
+  notes         String?
+  terms         String?
+  validUntil    DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model QuoteItem {
+  id          Int     @id @default(autoincrement())
+  quote       Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  quoteId     Int
+  description String
+  quantity    Int     @default(1)
+  unitPrice   Float
+  hasIva      Boolean @default(false)
+  onDemand    Boolean @default(false)
+  ivaAmount   Float   @default(0)
+  subtotal    Float   @default(0)
+  total       Float   @default(0)
 }

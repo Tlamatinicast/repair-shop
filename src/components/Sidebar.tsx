@@ -6,7 +6,7 @@ import { signOut } from 'next-auth/react';
 import Image from 'next/image';
 import {
   LayoutDashboard, Wrench, Users, Package, BarChart3,
-  ShoppingBag, Settings, ChevronRight, LogOut, Calculator,
+  ShoppingBag, Settings, ChevronRight, LogOut, Calculator, FileText,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -16,6 +16,7 @@ const allNav = [
   { href: '/customers', label: 'Clientes',     icon: Users,           adminOnly: false },
   { href: '/inventory', label: 'Inventario',   icon: Package,         adminOnly: false },
   { href: '/sales',          label: 'Ventas',         icon: ShoppingBag,     adminOnly: false },
+  { href: '/quotes',         label: 'Cotizaciones',   icon: FileText,        adminOnly: false },
   { href: '/corte-de-caja',  label: 'Corte de caja',  icon: Calculator,      adminOnly: true  },
   { href: '/reports',        label: 'Reportes',       icon: BarChart3,       adminOnly: true  },
 ];
