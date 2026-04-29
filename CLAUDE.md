@@ -3,7 +3,7 @@
 > Este archivo se carga automáticamente al iniciar Claude Code en este repositorio.
 > Mantenerlo actualizado para que cualquier nueva sesión arranque ya informada.
 >
-> Última actualización: 2026-04-22 (cierre de sesión)
+> Última actualización: 2026-04-28 (cierre de sesión)
 
 ---
 
@@ -53,7 +53,7 @@ Estados de pago (`paymentStatus`): `PENDING → PARTIAL → PAID` (aplica tanto 
 prisma/
   schema.prisma           # Modelos: Customer, Repair, InventoryItem, RepairPart,
                           #   RepairPhoto, RepairNote, RepairPayment, Sale, SaleItem,
-                          #   SalePayment, RepairStatusLog, User, Setting
+                          #   SalePayment, RepairStatusLog, User, Setting, Quote, QuoteItem
   migrations/             # Migraciones PostgreSQL
   seed.ts, seed.users.ts
 src/
@@ -65,10 +65,13 @@ src/
       sales/              # route.ts, [id]/(route.ts, payments/), stats/
       inventory/          # route.ts, [id]/, import/ (POST admin), export/ (GET admin)
       cash-close/         # export/ (GET admin) — corte de caja a Excel
+      quotes/             # route.ts (GET list + POST) y [id]/route.ts (GET + PATCH + DELETE admin)
       customers/, stats/, users/[id]/, auth/[...nextauth]/
       settings/           # GET (público) y PUT (admin) — clave/valor del negocio
     repairs/, customers/, inventory/, sales/, reports/, settings/, login/,
     corte-de-caja/        # vista admin con filtro de periodo + conciliación efectivo
+    quotes/               # page.tsx (lista), new/(page.tsx + NewQuoteForm.tsx),
+                          #   [id]/(page.tsx + QuoteActions.tsx + edit/page.tsx)
   components/             # Sidebar, BottomNav, MobileHeader, BusinessSettingsContext,
                           #   InventoryImportButton, InventoryCategorySelect, ui/
   lib/                    # prisma.ts, auth.ts, authOptions.ts, cloudinary.ts, utils.ts,
@@ -112,6 +115,9 @@ src/
 - **Timezone fijo en helpers de fecha/hora** — `src/lib/utils.ts` tiene `MX_TZ = 'America/Mexico_City'`. `formatDate` corregido, nuevos helpers `formatTime`, `formatDateTime`, `formatDateLong`. Usar **siempre estos helpers** en server components — Railway corre en UTC y sin `timeZone` los timestamps salen 6h desfasados. Los PDFs generados con jsPDF en el browser ya usan la zona local automáticamente.
 - **Recibo de venta con desglose de cobros** — `SaleReceiptButton` recibe `payments`, `amountPaid`, `paymentStatus`. PDF muestra sección "COBROS" con cada abono (monto + método + fecha/hora), total pagado y "SALDO PENDIENTE" en naranja si aplica. Venta liquidada con un pago: línea simple `Pagado · Efectivo`. PDF abre en pestaña nueva (`window.open(doc.output('bloburl'), '_blank')`) en vez de descargarse — igual que tickets de reparación.
 - **Tickets térmicos 80mm para reparaciones** — `TicketButtons.tsx` tiene `generateThermalEntry` y `generateThermalExit` (formato `[80, 280]` y `[80, 260]`, m=4mm). Entrada: folio+hora, cliente, dispositivo, accesorios, condición física, problema, costo estimado, términos, firma con fondo blanco explícito (`doc.rect FD` antes de `addImage`). Salida: cliente, dispositivo, desglose de piezas (fetch `/api/repairs/[id]/parts`), resumen de cobro, historial `RepairPayment` (prop `payments[]` pasado desde `page.tsx`), garantía, cajas de firma cliente+técnico. Botones A4 renombrados a "Nota de entrada" / "Nota de salida", agrupados bajo separador. Botones principales: "Ticket de entrada (80mm)" / "Ticket de salida (80mm)". Impresión térmica ya funciona — pendiente solo etiqueta con sticker (sin impresora aún).
+- **diagnosisFee + piezas de servicio** — `laborCost` renombrado a `diagnosisFee` en schema, API y UI. `RepairPart` ahora tiene `isService Boolean` y `serviceName String?` para registrar mano de obra como líneas libres (sin inventario). En tickets: sección "Servicios" separada de "Piezas utilizadas". `recalcRepairTotal = diagnosisFee + servicePartsTotal + inventoryPartsTotal` (ya NO suma ventas asociadas). Setting key relevante: n/a (diagnosisFee es campo del Repair).
+- **Bloqueo de órdenes cerradas** — `RepairWorkspace.tsx` detecta `isTerminal = status === 'DELIVERED' || status === 'CANCELLED'` y bloquea agregar/eliminar piezas y pagos. Admin puede desbloquear: elige nuevo estado (REOPEN_STATUSES) + escribe razón → PATCH status + POST nota al timeline → `isUnlocked = true` → `router.refresh()`. Esto queda registrado con timestamp.
+- **Módulo de cotizaciones** — modelos `Quote` + `QuoteItem` en schema. API REST completa en `/api/quotes`. Páginas: `/quotes` (lista con stats), `/quotes/new` (form con búsqueda de cliente o nombre libre, conceptos con IVA 16% bidireccional por item, flag "bajo pedido", descuento, anticipo, validez), `/quotes/[id]` (detalle), `/quotes/[id]/edit` (solo DRAFT). `QuoteActions.tsx`: PDF teal A4 (mismo estilo que notas de reparación), cambio de estado (DRAFT→SENT→ACCEPTED/REJECTED), WhatsApp con mensaje prellenado, convertir a orden de reparación o venta (PATCH a ACCEPTED + redirect a /repairs/new o /sales/new), eliminar (admin). Cotizaciones en Sidebar (después de Ventas). Settings de cotizaciones en `/settings` (`quoteTerms`, `quoteValidityDays`). Estados: DRAFT/SENT/ACCEPTED/REJECTED/EXPIRED (EXPIRED se deriva si validUntil < hoy y status=SENT). Número formato: `COT-{año}-{seq 4 dígitos}`.
 
 ---
 
@@ -146,11 +152,11 @@ src/
 
 ---
 
-## Estado actual al 2026-04-23 (cierre de sesión)
+## Estado actual al 2026-04-28 (cierre de sesión)
 
-**Último commit en `main`:** `a23a205 Tickets termicos 80mm de entrada y salida para reparaciones`
+**Último commit en `main`:** `1e9c100 Módulo de cotizaciones (Quotes)`
 
-**Sesión cerró con:** backup clientes, fix timezone, recibo venta con cobros, tickets térmicos 80mm de entrada y salida validados en producción. Impresión térmica funcionando. Pendiente: impresora de etiquetas para stickers QR (Tlami aún no decide cuál comprar).
+**Sesión cerró con:** fix total en lista de reparaciones (no sumaba ventas), bloqueo de órdenes cerradas con desbloqueo admin, renombre laborCost→diagnosisFee, piezas de servicio (isService), módulo completo de cotizaciones validado en producción.
 
 **En producción:** https://repair-shop-production-c450.up.railway.app  
 **Credenciales demo:** admin@repaiross.com / admin123 · tecnico@repaiross.com / tecnico123
@@ -182,14 +188,17 @@ model Setting {
 }
 ```
 
-Keys usadas: `businessName`, `businessPhone`, `businessDomain`
+Keys usadas: `businessName`, `businessPhone`, `businessDomain`, `quoteTerms`, `quoteValidityDays`
 
 ### Demás modelos clave
 
-- `Repair`: `advancePayment`, `paymentStatus`, `queueDate`, `dueDate`, `partsEta`, `isDefinedService`, `accessories`, `physicalCondition`, `clientSignature`, `warrantyType`, `warrantyVoided`, `warrantyVoidReason`, relaciones `sales`, `statusLogs`
+- `Repair`: `advancePayment`, `paymentStatus`, `queueDate`, `dueDate`, `partsEta`, `diagnosisFee` (antes `laborCost`), `isDefinedService`, `accessories`, `physicalCondition`, `clientSignature`, `warrantyType`, `warrantyVoided`, `warrantyVoidReason`, relaciones `sales`, `statusLogs`
+- `RepairPart`: `itemId Int?` (nullable), `isService Boolean`, `serviceName String?` — piezas de inventario O líneas de mano de obra libre
 - `User`: `id`, `name`, `email`, `password`, `role`, `active` — el `id` y `role` se incluyen en el JWT de sesión
 - `Sale`: `amountPaid`, `paymentStatus`, relación `payments: SalePayment[]`
 - `RepairNote`: `photoUrls: String?` (JSON array de URLs Cloudinary)
+- `Quote`: `quoteNumber`, `status` (DRAFT/SENT/ACCEPTED/REJECTED), `customerId?`, `customerName`, `customerPhone`, `subtotal`, `discount`, `ivaAmount`, `total`, `deposit`, `terms`, `validUntil`, relación `items: QuoteItem[]`
+- `QuoteItem`: `description`, `quantity`, `unitPrice` (sin IVA), `hasIva`, `onDemand`, `ivaAmount`, `subtotal`, `total`
 
 ---
 
@@ -229,10 +238,12 @@ Keys usadas: `businessName`, `businessPhone`, `businessDomain`
 - [x] Pagos de reparación con método (RepairPayment + UI rediseñada)
 - [x] Corte de caja v1 (vista en vivo con desglose por método y conciliación)
 - [x] Backup de Clientes — export/import Excel por teléfono como llave natural
+- [x] Módulo de cotizaciones — PDF teal A4, estados, WhatsApp, convertir a orden/venta
 - [ ] Export-only para reportes operativos de Reparaciones/Ventas (pendiente, decidir cuándo se necesite)
 - [ ] DB limpia sin datos demo para producción
 - [ ] Expansión de `deviceType` para módulos vehiculares y dispositivos médicos
 - [ ] Cierre de caja persistente (Corte de caja v2: registros históricos `CashClose` con snapshot de totales y conteo físico — diferido hasta validar v1 con uso real)
+- [ ] Mostrar cotizaciones asociadas en perfil de cliente (`/customers/[id]`)
 
 ---
 
