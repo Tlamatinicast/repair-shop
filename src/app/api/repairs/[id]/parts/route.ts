@@ -15,17 +15,13 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 async function recalcRepairTotal(tx: any, repairId: number) {
   const repair = await tx.repair.findUnique({
     where: { id: repairId },
-    include: {
-      parts: true,
-      sales: true,
-    },
+    include: { parts: true },
   });
   if (!repair) return;
   const partsTotal = repair.parts.reduce((s: number, p: any) => s + p.unitPrice * p.quantity, 0);
-  const salesTotal = repair.sales.reduce((s: number, sale: any) => s + sale.total, 0);
   await tx.repair.update({
     where: { id: repairId },
-    data: { totalCost: repair.laborCost + partsTotal + salesTotal },
+    data: { totalCost: repair.laborCost + partsTotal },
   });
 }
 

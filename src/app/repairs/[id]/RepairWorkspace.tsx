@@ -316,7 +316,7 @@ export function RepairWorkspace({
           </div>
         ) : (
           <div className="flex gap-2">
-            <button onClick={() => openAddPayment()} disabled={isPaid || total === 0}
+            <button onClick={() => openAddPayment()} disabled={isPaid || total === 0 || pending <= 0}
               className="btn-secondary flex-1 justify-center text-xs disabled:opacity-40">
               <DollarSign size={12} /> Agregar pago
             </button>
