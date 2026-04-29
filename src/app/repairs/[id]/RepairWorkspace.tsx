@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Search, Plus, Trash2, Loader2, Lock, CheckCircle,
-  Clock, DollarSign, AlertTriangle, ExternalLink, ShoppingCart,
+  Clock, DollarSign, AlertTriangle, ExternalLink, ShoppingCart, Wrench,
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/utils';
@@ -18,9 +18,14 @@ interface InventoryItem {
 }
 
 interface Part {
-  id: number; itemId: number; quantity: number;
-  unitPrice: number; reserved: boolean;
-  item: { name: string; sku: string };
+  id: number;
+  itemId: number | null;
+  quantity: number;
+  unitPrice: number;
+  reserved: boolean;
+  isService: boolean;
+  serviceName: string | null;
+  item: { name: string; sku: string } | null;
 }
 
 interface Sale {
@@ -40,7 +45,7 @@ interface RepairPayment {
 interface Props {
   repairId: number;
   customerId: number;
-  laborCost: number;
+  diagnosisFee: number;
   initialParts: Part[];
   initialSales: Sale[];
   initialAdvance: number;
@@ -58,7 +63,7 @@ const PAYMENT_METHOD_LABEL: Record<string, string> = {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function RepairWorkspace({
-  repairId, customerId, laborCost,
+  repairId, customerId, diagnosisFee,
   initialParts, initialSales, initialAdvance, initialPaymentStatus,
   initialPayments, isAdmin,
 }: Props) {
@@ -71,16 +76,17 @@ export function RepairWorkspace({
   const [payStatus, setPayStatus] = useState(initialPaymentStatus);
   const [payments, setPayments] = useState<RepairPayment[]>(initialPayments);
 
-  // Derived totals — always computed from current state
-  // Nota: las ventas asociadas (`sales`) NO suman al total de la orden.
-  // Cada venta es independiente, se cobra por POS y tiene su propio ticket.
-  const partsTotal = parts.reduce((s, p) => s + p.unitPrice * p.quantity, 0);
-  const salesTotal = sales.reduce((s, sale) => s + sale.total, 0); // solo informativo
-  const total      = laborCost + partsTotal;
-  const pending    = Math.max(0, total - advance);
-  const isPaid     = payStatus === 'PAID';
+  // Derived totals
+  const inventoryParts = parts.filter(p => !p.isService);
+  const serviceParts   = parts.filter(p => p.isService);
+  const inventoryTotal = inventoryParts.reduce((s, p) => s + p.unitPrice * p.quantity, 0);
+  const serviceTotal   = serviceParts.reduce((s, p) => s + p.unitPrice * p.quantity, 0);
+  const salesTotal     = sales.reduce((s, sale) => s + sale.total, 0); // solo informativo
+  const total          = diagnosisFee + serviceTotal + inventoryTotal;
+  const pending        = Math.max(0, total - advance);
+  const isPaid         = payStatus === 'PAID';
 
-  // ── Parts state ──
+  // ── Inventory parts state ──
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [search, setSearch]       = useState('');
   const [filtered, setFiltered]   = useState<InventoryItem[]>([]);
@@ -91,6 +97,13 @@ export function RepairWorkspace({
   const [reserved, setReserved]   = useState(false);
   const [addingPart, setAddingPart] = useState(false);
   const [partError, setPartError] = useState('');
+
+  // ── Service parts state ──
+  const [showAddService, setShowAddService]   = useState(false);
+  const [serviceDesc, setServiceDesc]         = useState('');
+  const [servicePrice, setServicePrice]       = useState('');
+  const [addingService, setAddingService]     = useState(false);
+  const [serviceError, setServiceError]       = useState('');
 
   // ── Payment state ──
   const [showAddPayment, setShowAddPayment] = useState(false);
@@ -112,7 +125,7 @@ export function RepairWorkspace({
     setFiltered(inventory.filter(i => i.name.toLowerCase().includes(q) || i.sku.toLowerCase().includes(q)).slice(0, 6));
   }, [search, inventory]);
 
-  // ── Parts handlers ────────────────────────────────────────────────────────
+  // ── Inventory parts handlers ───────────────────────────────────────────────
 
   const selectItem = (item: InventoryItem) => {
     setSelected(item); setPrice(item.salePrice); setQty(1);
@@ -130,7 +143,6 @@ export function RepairWorkspace({
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
       const part = await res.json();
-      // Update local state immediately
       setParts(prev => [...prev, part]);
       setSelected(null); setQty(1); setPrice(0); setReserved(false);
     } catch (err: any) { setPartError(err.message); }
@@ -139,7 +151,6 @@ export function RepairWorkspace({
 
   const handleDeletePart = async (partId: number) => {
     if (!confirm('¿Quitar esta pieza?')) return;
-    // Optimistic update
     const prev = parts;
     setParts(p => p.filter(x => x.id !== partId));
     try {
@@ -163,6 +174,27 @@ export function RepairWorkspace({
       if (!res.ok) throw new Error();
       setParts(prev => prev.map(p => p.id === partId ? { ...p, reserved: false } : p));
     } catch { alert('Error al confirmar.'); }
+  };
+
+  // ── Service parts handlers ─────────────────────────────────────────────────
+
+  const handleAddService = async () => {
+    const amt = parseFloat(servicePrice);
+    if (!serviceDesc.trim()) { setServiceError('Describe el servicio.'); return; }
+    if (!Number.isFinite(amt) || amt < 0) { setServiceError('Precio inválido.'); return; }
+    setAddingService(true); setServiceError('');
+    try {
+      const res = await fetch(`/api/repairs/${repairId}/parts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isService: true, serviceName: serviceDesc.trim(), unitPrice: amt }),
+      });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+      const part = await res.json();
+      setParts(prev => [...prev, part]);
+      setServiceDesc(''); setServicePrice(''); setShowAddService(false);
+    } catch (err: any) { setServiceError(err.message); }
+    finally { setAddingService(false); }
   };
 
   // ── Payment handlers ──────────────────────────────────────────────────────
@@ -214,8 +246,9 @@ export function RepairWorkspace({
       <div className="card p-5">
         <p className="section-title mb-4">Resumen y pago</p>
         <div className="space-y-2">
-          <SumRow label="Mano de obra"       value={laborCost}   />
-          <SumRow label="Piezas"             value={partsTotal}  />
+          <SumRow label="Diagnóstico"  value={diagnosisFee} />
+          {serviceTotal > 0 && <SumRow label="Mano de obra" value={serviceTotal} />}
+          <SumRow label="Piezas"       value={inventoryTotal} />
           <div className="flex justify-between items-center pt-2 border-t border-[#1e1e1e]">
             <span className="text-sm font-semibold text-[#ddd]">Total</span>
             <span className="font-mono text-base font-semibold text-amber-400">{formatCurrency(total)}</span>
@@ -283,16 +316,12 @@ export function RepairWorkspace({
               <label className="label text-[9px]">Método de pago</label>
               <div className="grid grid-cols-3 gap-1.5">
                 {(Object.entries(PAYMENT_METHODS) as [keyof typeof PAYMENT_METHODS, string][]).map(([k, v]) => (
-                  <button
-                    key={k}
-                    type="button"
-                    onClick={() => setPayMethod(k)}
+                  <button key={k} type="button" onClick={() => setPayMethod(k)}
                     className={`py-2 rounded-lg text-xs font-medium border transition-all ${
                       payMethod === k
                         ? 'bg-amber-500/10 border-amber-500/40 text-amber-400'
                         : 'bg-[#111] border-[#1e1e1e] text-[#666] hover:border-[#2a2a2a]'
-                    }`}
-                  >
+                    }`}>
                     {v}
                   </button>
                 ))}
@@ -331,13 +360,77 @@ export function RepairWorkspace({
         )}
       </div>
 
+      {/* ── MANO DE OBRA ── */}
+      <div className="card p-5">
+        <p className="section-title mb-4">Mano de obra</p>
+
+        {serviceParts.length > 0 && (
+          <div className="space-y-2 mb-4">
+            {serviceParts.map(part => (
+              <div key={part.id} className="flex items-center gap-3 p-3 rounded-xl border bg-[#0f0f0f] border-[#1a1a1a]">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <Wrench size={10} className="text-amber-400 flex-shrink-0" />
+                    <p className="text-sm text-[#ddd] truncate">{part.serviceName}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="font-mono text-sm text-amber-400">{formatCurrency(part.unitPrice)}</span>
+                  <button onClick={() => handleDeletePart(part.id)} className="text-[#444] hover:text-red-400 transition-colors p-1">
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              </div>
+            ))}
+            <div className="flex justify-between px-1 pt-1 border-t border-[#1a1a1a]">
+              <span className="text-xs text-[#666]">Subtotal mano de obra</span>
+              <span className="font-mono text-sm font-semibold text-amber-400">{formatCurrency(serviceTotal)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Agregar servicio */}
+        {showAddService ? (
+          <div className="border border-dashed border-[#2a2a2a] rounded-xl p-4 bg-[#0d0d0d] space-y-3">
+            <p className="text-xs font-semibold text-[#888]">Nuevo concepto de mano de obra</p>
+            <div>
+              <label className="label text-[9px]">Descripción</label>
+              <input type="text" value={serviceDesc} onChange={e => setServiceDesc(e.target.value)}
+                className="input text-sm" autoFocus placeholder="Ej. Reballing GPU, Cambio de pasta térmica..." />
+            </div>
+            <div>
+              <label className="label text-[9px]">Precio (MXN)</label>
+              <input type="number" min="0" step="0.01" value={servicePrice}
+                onChange={e => setServicePrice(e.target.value)} className="input text-sm" placeholder="0.00" />
+            </div>
+            {serviceError && (
+              <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-2">
+                <AlertTriangle size={12} /> {serviceError}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button onClick={() => { setShowAddService(false); setServiceDesc(''); setServicePrice(''); setServiceError(''); }}
+                className="btn-ghost flex-1 justify-center text-xs">Cancelar</button>
+              <button onClick={handleAddService} disabled={addingService} className="btn-primary flex-1 justify-center text-xs disabled:opacity-50">
+                {addingService ? <Loader2 size={12} className="animate-spin" /> : <><Plus size={12} /> Agregar</>}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setShowAddService(true)}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-[#2a2a2a] text-xs text-[#555] hover:text-amber-400 hover:border-amber-500/30 transition-colors">
+            <Plus size={13} /> Agregar concepto de mano de obra
+          </button>
+        )}
+      </div>
+
       {/* ── PIEZAS UTILIZADAS ── */}
       <div className="card p-5">
         <p className="section-title mb-4">Piezas utilizadas</p>
 
-        {parts.length > 0 && (
+        {inventoryParts.length > 0 && (
           <div className="space-y-2 mb-4">
-            {parts.map(part => (
+            {inventoryParts.map(part => (
               <div key={part.id} className={`flex items-center gap-3 p-3 rounded-xl border ${
                 part.reserved ? 'bg-amber-500/5 border-amber-500/20' : 'bg-[#0f0f0f] border-[#1a1a1a]'
               }`}>
@@ -346,7 +439,7 @@ export function RepairWorkspace({
                     {part.reserved
                       ? <Lock size={10} className="text-amber-400 flex-shrink-0" />
                       : <CheckCircle size={10} className="text-green-400 flex-shrink-0" />}
-                    <p className="text-sm text-[#ddd] truncate">{part.item.name}</p>
+                    <p className="text-sm text-[#ddd] truncate">{part.item?.name}</p>
                   </div>
                   <p className="text-xs text-[#555] font-mono ml-4">
                     {part.quantity}x · {formatCurrency(part.unitPrice)} c/u
@@ -369,14 +462,14 @@ export function RepairWorkspace({
             ))}
             <div className="flex justify-between px-1 pt-1 border-t border-[#1a1a1a]">
               <span className="text-xs text-[#666]">Total en piezas</span>
-              <span className="font-mono text-sm font-semibold text-amber-400">{formatCurrency(partsTotal)}</span>
+              <span className="font-mono text-sm font-semibold text-amber-400">{formatCurrency(inventoryTotal)}</span>
             </div>
           </div>
         )}
 
-        {/* Add part */}
+        {/* Buscador de inventario */}
         <div className="border border-dashed border-[#2a2a2a] rounded-xl p-4 bg-[#0d0d0d] space-y-3">
-          <p className="text-xs font-semibold text-[#888]">Agregar pieza</p>
+          <p className="text-xs font-semibold text-[#888]">Agregar pieza de inventario</p>
           <div className="relative">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#555]" />
             <input value={search} onChange={e => setSearch(e.target.value)}
@@ -455,15 +548,13 @@ export function RepairWorkspace({
               </button>
             </div>
           )}
-          {parts.length === 0 && !selected && (
-            <p className="text-xs text-[#444] text-center py-2">Sin piezas registradas.</p>
+          {inventoryParts.length === 0 && !selected && (
+            <p className="text-xs text-[#444] text-center py-2">Sin piezas de inventario registradas.</p>
           )}
         </div>
       </div>
 
       {/* ── PRODUCTOS VENDIDOS (solo informativo) ── */}
-      {/* Las ventas ligadas a esta orden se registran desde el POS. */}
-      {/* Aquí solo aparecen como referencia; no suman al total de la orden. */}
       <div className="card p-5">
         <div className="flex items-center justify-between mb-4">
           <p className="section-title mb-0">Productos vendidos</p>
@@ -500,10 +591,7 @@ export function RepairWorkspace({
           <p className="text-xs text-[#444] text-center py-2 mb-4">Sin productos vendidos asociados.</p>
         )}
 
-        <Link
-          href={`/sales/new?customerId=${customerId}&repairId=${repairId}`}
-          className="btn-secondary w-full justify-center"
-        >
+        <Link href={`/sales/new?customerId=${customerId}&repairId=${repairId}`} className="btn-secondary w-full justify-center">
           <ShoppingCart size={13} /> Registrar venta en POS
         </Link>
       </div>

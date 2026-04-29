@@ -18,7 +18,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (error) return error;
   try {
     const body = await req.json();
-    const { status, deviceType, deviceBrand, deviceModel, serialNumber, password, issue, diagnosis, notes, laborCost, totalCost, partsEta, warrantyType, warrantyVoided, warrantyVoidReason } = body;
+    const { status, deviceType, deviceBrand, deviceModel, serialNumber, password, issue, diagnosis, notes, diagnosisFee, totalCost, partsEta, warrantyType, warrantyVoided, warrantyVoidReason } = body;
     const data: Record<string, any> = {};
 
     const existingRepair = await prisma.repair.findUnique({ where: { id: Number(params.id) } });
@@ -37,7 +37,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (issue        !== undefined) data.issue        = issue;
     if (diagnosis    !== undefined) data.diagnosis    = diagnosis || null;
     if (notes        !== undefined) data.notes        = notes || null;
-    if (laborCost    !== undefined) data.laborCost    = parseFloat(laborCost);
+    if (diagnosisFee !== undefined) data.diagnosisFee = parseFloat(diagnosisFee);
     if (totalCost    !== undefined) data.totalCost    = parseFloat(totalCost);
     if (partsEta          !== undefined) data.partsEta          = partsEta ? new Date(partsEta) : null;
     if (warrantyType      !== undefined) data.warrantyType      = warrantyType;

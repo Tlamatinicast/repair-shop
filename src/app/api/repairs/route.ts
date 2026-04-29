@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     const {
       customerId, customerName, customerPhone, customerEmail, customerAddress,
       deviceType, deviceBrand, deviceModel, serialNumber, password,
-      issue, notes, status, laborCost, queueDate, dueDate, isDefinedService,
+      issue, notes, status, diagnosisFee, queueDate, dueDate, isDefinedService,
       contactPreference, accessories, physicalCondition, physicalNotes,
       serviceType, authorizedDiagnosis, clientSignature,
     } = body;
@@ -71,8 +71,8 @@ export async function POST(req: NextRequest) {
           issue,
           notes:               notes || null,
           status:              initialStatus,
-          laborCost:           parseFloat(laborCost as string) || 0,
-          totalCost:           parseFloat(laborCost as string) || 0,
+          diagnosisFee:        parseFloat(diagnosisFee as string) || 0,
+          totalCost:           parseFloat(diagnosisFee as string) || 0,
           queueDate:           new Date(queueDate),
           dueDate:             (serviceType === 'DIRECT_REPAIR' || isDefinedService === 'true' || isDefinedService === true) && dueDate ? new Date(dueDate) : null,
           isDefinedService:    serviceType === 'DIRECT_REPAIR' || isDefinedService === 'true' || isDefinedService === true,

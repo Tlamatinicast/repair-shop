@@ -21,7 +21,7 @@ async function recalcRepairTotal(tx: any, repairId: number) {
   const partsTotal = repair.parts.reduce((s: number, p: any) => s + p.unitPrice * p.quantity, 0);
   await tx.repair.update({
     where: { id: repairId },
-    data: { totalCost: repair.laborCost + partsTotal },
+    data: { totalCost: repair.diagnosisFee + partsTotal },
   });
 }
 
@@ -29,9 +29,26 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const { error } = await apiRequireAuth();
   if (error) return error;
   try {
-    const { itemId, quantity, unitPrice, reserved } = await req.json();
+    const { itemId, quantity, unitPrice, reserved, isService, serviceName } = await req.json();
     const repairId = Number(params.id);
 
+    // ── Línea de servicio (mano de obra, sin inventario) ──────────────────
+    if (isService) {
+      if (!serviceName?.trim()) {
+        return NextResponse.json({ error: 'El servicio necesita una descripción' }, { status: 400 });
+      }
+      const part = await prisma.$transaction(async (tx) => {
+        const newPart = await tx.repairPart.create({
+          data: { repairId, isService: true, serviceName: serviceName.trim(), quantity: 1, unitPrice: parseFloat(unitPrice) || 0, reserved: false },
+          include: { item: true },
+        });
+        await recalcRepairTotal(tx, repairId);
+        return newPart;
+      });
+      return NextResponse.json(part, { status: 201 });
+    }
+
+    // ── Pieza de inventario ────────────────────────────────────────────────
     const inv = await prisma.inventoryItem.findUnique({ where: { id: Number(itemId) } });
     if (!inv) return NextResponse.json({ error: 'Pieza no encontrada' }, { status: 404 });
 
@@ -43,28 +60,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     const part = await prisma.$transaction(async (tx) => {
-      // 1. Create the part first
       const newPart = await tx.repairPart.create({
         data: { repairId, itemId: Number(itemId), quantity, unitPrice, reserved: !!reserved },
         include: { item: true },
       });
 
-      // 2. Update inventory
       if (reserved) {
-        await tx.inventoryItem.update({
-          where: { id: Number(itemId) },
-          data: { reservedQty: { increment: quantity } },
-        });
+        await tx.inventoryItem.update({ where: { id: Number(itemId) }, data: { reservedQty: { increment: quantity } } });
       } else {
-        await tx.inventoryItem.update({
-          where: { id: Number(itemId) },
-          data: { quantity: { decrement: quantity } },
-        });
+        await tx.inventoryItem.update({ where: { id: Number(itemId) }, data: { quantity: { decrement: quantity } } });
       }
 
-      // 3. Recalc total AFTER part is created (so it's included)
       await recalcRepairTotal(tx, repairId);
-
       return newPart;
     });
 
@@ -88,23 +95,17 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     if (!part) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
 
     await prisma.$transaction(async (tx) => {
-      // 1. Delete part first
       await tx.repairPart.delete({ where: { id: Number(partId) } });
 
-      // 2. Restore stock or reservation
-      if (part.reserved) {
-        await tx.inventoryItem.update({
-          where: { id: part.itemId },
-          data: { reservedQty: { decrement: part.quantity } },
-        });
-      } else {
-        await tx.inventoryItem.update({
-          where: { id: part.itemId },
-          data: { quantity: { increment: part.quantity } },
-        });
+      // Solo restaurar stock en piezas de inventario
+      if (!part.isService && part.itemId) {
+        if (part.reserved) {
+          await tx.inventoryItem.update({ where: { id: part.itemId }, data: { reservedQty: { decrement: part.quantity } } });
+        } else {
+          await tx.inventoryItem.update({ where: { id: part.itemId }, data: { quantity: { increment: part.quantity } } });
+        }
       }
 
-      // 3. Recalc total AFTER part is deleted (so it's excluded)
       await recalcRepairTotal(tx, repairId);
     });
 
@@ -123,16 +124,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const repairId = Number(params.id);
 
     const part = await prisma.repairPart.findUnique({ where: { id: Number(partId) } });
-    if (!part || !part.reserved) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
+    if (!part || !part.reserved || part.isService) return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
 
     await prisma.$transaction(async (tx) => {
       await tx.repairPart.update({ where: { id: Number(partId) }, data: { reserved: false } });
       await tx.inventoryItem.update({
-        where: { id: part.itemId },
-        data: {
-          reservedQty: { decrement: part.quantity },
-          quantity:    { decrement: part.quantity },
-        },
+        where: { id: part.itemId! },
+        data: { reservedQty: { decrement: part.quantity }, quantity: { decrement: part.quantity } },
       });
       await recalcRepairTotal(tx, repairId);
     });

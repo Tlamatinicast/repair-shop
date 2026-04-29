@@ -135,12 +135,14 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
             {/* Workspace: parts + summary + payment + sales — all in one */}
             <RepairWorkspace
               repairId={repair.id}
-              laborCost={repair.laborCost}
+              diagnosisFee={(repair as any).diagnosisFee ?? 0}
               customerId={repair.customerId}
               initialParts={repair.parts.map(p => ({
                 id: p.id, itemId: p.itemId, quantity: p.quantity,
                 unitPrice: p.unitPrice, reserved: p.reserved,
-                item: { name: p.item.name, sku: p.item.sku },
+                isService: (p as any).isService ?? false,
+                serviceName: (p as any).serviceName ?? null,
+                item: p.item ? { name: p.item.name, sku: p.item.sku } : null,
               }))}
               initialSales={repair.sales.map(s => ({
                 id: s.id, saleNumber: s.saleNumber, total: s.total,
@@ -174,6 +176,7 @@ export default async function RepairDetailPage({ params }: { params: { id: strin
                 biz={biz}
                 repair={{
                   ...repair,
+                  diagnosisFee: (repair as any).diagnosisFee ?? 0,
                   createdAt: repair.createdAt.toISOString(),
                   dueDate: repair.dueDate?.toISOString() ?? null,
                   deliveredAt: repair.deliveredAt?.toISOString() ?? null,

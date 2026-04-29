@@ -453,8 +453,8 @@ export default function NewRepairPage() {
                 </select>
               </div>
               <div>
-                <label className="label">Costo estimado (MXN)</label>
-                <input name="laborCost" type="number" step="0.01" min="0" placeholder="0.00" className="input" />
+                <label className="label">Diagnóstico estimado (MXN)</label>
+                <input name="diagnosisFee" type="number" step="0.01" min="0" placeholder="0.00" className="input" />
               </div>
             </div>
           </div>

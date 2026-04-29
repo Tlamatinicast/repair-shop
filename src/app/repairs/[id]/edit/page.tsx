@@ -133,7 +133,7 @@ export default function EditRepairPage() {
         <div className="card p-5 space-y-4">
           <h2 className="text-sm font-semibold text-[#ccc] pb-3 border-b border-[#1a1a1a]">Costos</h2>
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Mano de obra (MXN)" name="laborCost" type="number" defaultValue={String(repair.laborCost)} />
+            <Field label="Diagnóstico (MXN)" name="diagnosisFee" type="number" defaultValue={String(repair.diagnosisFee ?? repair.laborCost ?? 0)} />
             <Field label="Total (MXN)" name="totalCost" type="number" defaultValue={String(repair.totalCost)} />
           </div>
         </div>

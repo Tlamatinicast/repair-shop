@@ -33,7 +33,7 @@ model Repair {
   issue             String
   diagnosis         String?
   notes             String?
-  laborCost         Float              @default(0)
+  diagnosisFee      Float              @default(0)
   totalCost         Float              @default(0)
   advancePayment    Float              @default(0)
   paymentStatus     String             @default("PENDING")
@@ -91,14 +91,16 @@ model InventoryItem {
 }
 
 model RepairPart {
-  id        Int           @id @default(autoincrement())
-  repair    Repair        @relation(fields: [repairId], references: [id], onDelete: Cascade)
-  repairId  Int
-  item      InventoryItem @relation(fields: [itemId], references: [id])
-  itemId    Int
-  quantity  Int           @default(1)
-  unitPrice Float
-  reserved  Boolean       @default(false)
+  id          Int            @id @default(autoincrement())
+  repair      Repair         @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  repairId    Int
+  item        InventoryItem? @relation(fields: [itemId], references: [id])
+  itemId      Int?
+  quantity    Int            @default(1)
+  unitPrice   Float
+  reserved    Boolean        @default(false)
+  isService   Boolean        @default(false)
+  serviceName String?
 }
 
 model RepairPhoto {

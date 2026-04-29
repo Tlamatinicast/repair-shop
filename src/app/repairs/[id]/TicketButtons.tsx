@@ -13,7 +13,7 @@ interface Repair {
   issue: string;
   diagnosis?: string | null;
   notes?: string | null;
-  laborCost: number;
+  diagnosisFee: number;
   totalCost: number;
   advancePayment: number;
   paymentStatus: string;
@@ -285,12 +285,12 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       const costH = 15;
       fill(...TEAL_L); doc.rect(0, y, pageW, costH, 'F');
       doc.setFont('helvetica', 'bold'); doc.setFontSize(9); txt(...TEAL_DP);
-      doc.text('Costo estimado de mano de obra', margin, y + 6.5);
+      doc.text('Diagnóstico estimado', margin, y + 6.5);
       doc.setFont('helvetica', 'normal'); doc.setFontSize(8); txt(...TEAL_M);
-      doc.text('Las piezas pueden generar cargos adicionales', margin, y + 11.5);
+      doc.text('La mano de obra y piezas pueden generar cargos adicionales', margin, y + 11.5);
       doc.setFont('helvetica', 'bold'); doc.setFontSize(20); txt(...TEAL_D);
       doc.text(
-        repair.laborCost > 0 ? fmt(repair.laborCost) : 'Por cotizar',
+        repair.diagnosisFee > 0 ? fmt(repair.diagnosisFee) : 'Por cotizar',
         pageW - margin, y + 11, { align: 'right' }
       );
       y += costH + 3;
@@ -357,13 +357,16 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       // El ticket de entrega solo cubre la reparación (mano de obra + piezas).
       // Las ventas ligadas a la orden tienen su propio ticket y no se incluyen.
       const partsRes = await fetch(`/api/repairs/${repair.id}/parts`);
-      const parts: any[] = partsRes.ok ? await partsRes.json() : [];
+      const allParts: any[] = partsRes.ok ? await partsRes.json() : [];
 
-      const partsTotal = parts.reduce((s: number, p: any) => s + p.unitPrice * p.quantity, 0);
-      const total      = repair.laborCost + partsTotal;
-      const advance    = repair.advancePayment ?? 0;
-      const pending    = Math.max(0, total - advance);
-      const isPaid     = pending <= 0 && total > 0;
+      const inventoryParts = allParts.filter((p: any) => !p.isService);
+      const serviceParts   = allParts.filter((p: any) => p.isService);
+      const inventoryTotal = inventoryParts.reduce((s: number, p: any) => s + p.unitPrice * p.quantity, 0);
+      const serviceTotal   = serviceParts.reduce((s: number, p: any) => s + p.unitPrice * p.quantity, 0);
+      const total          = repair.diagnosisFee + serviceTotal + inventoryTotal;
+      const advance        = repair.advancePayment ?? 0;
+      const pending        = Math.max(0, total - advance);
+      const isPaid         = pending <= 0 && total > 0;
 
       const { jsPDF } = await import('jspdf');
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -494,19 +497,65 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       sep();
 
       // ══════════════════════════════════════════════════════════════════════
+      // SECCIÓN: SERVICIOS (diagnóstico + mano de obra)
+      // ══════════════════════════════════════════════════════════════════════
+      if (repair.diagnosisFee > 0 || serviceParts.length > 0) {
+        sLabel('Servicios');
+
+        const colCant = margin;
+        const colDesc = margin + 15;
+        const colImp  = pageW - margin;
+        const descW   = colImp - colDesc - 4;
+
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); txt(...GR4);
+        doc.text('CANT.', colCant, y);
+        doc.text('DESCRIPCIÓN', colDesc, y);
+        doc.text('IMPORTE', colImp, y, { align: 'right' });
+        y += 2;
+        draw(...SEP); doc.setLineWidth(0.3); doc.line(margin, y, pageW - margin, y);
+        y += 4;
+
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); txt(...GR9);
+
+        if (repair.diagnosisFee > 0) {
+          doc.text('1×', colCant, y);
+          doc.text('Diagnóstico', colDesc, y);
+          doc.setFont('helvetica', 'bold');
+          doc.text(fmt(repair.diagnosisFee), colImp, y, { align: 'right' });
+          doc.setFont('helvetica', 'normal');
+          y += 6;
+          draw(241, 239, 232); doc.setLineWidth(0.2); doc.line(margin, y - 1, pageW - margin, y - 1);
+        }
+
+        serviceParts.forEach((p: any) => {
+          const name = p.serviceName ?? 'Mano de obra';
+          const descLines = doc.splitTextToSize(name, descW);
+          const rowH = Math.max(descLines.length * 4.5, 5);
+          doc.text('1×', colCant, y);
+          doc.text(descLines, colDesc, y);
+          doc.setFont('helvetica', 'bold');
+          doc.text(fmt(p.unitPrice), colImp, y, { align: 'right' });
+          doc.setFont('helvetica', 'normal');
+          y += rowH + 2;
+          draw(241, 239, 232); doc.setLineWidth(0.2); doc.line(margin, y - 1, pageW - margin, y - 1);
+        });
+
+        y += 2;
+        sep();
+      }
+
+      // ══════════════════════════════════════════════════════════════════════
       // SECCIÓN: PIEZAS UTILIZADAS (tabla)
       // ══════════════════════════════════════════════════════════════════════
-      if (parts.length > 0) {
+      if (inventoryParts.length > 0) {
         sLabel('Piezas utilizadas');
 
-        // Columnas de la tabla: Cant. (15) / Descripción (flexible) / Precio unit. (28) / Importe (28)
         const colCant = margin;
         const colDesc = margin + 15;
         const colUnit = pageW - margin - 56;
         const colImp  = pageW - margin;
         const descW   = colUnit - colDesc - 4;
 
-        // Header
         doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); txt(...GR4);
         doc.text('CANT.', colCant, y);
         doc.text('DESCRIPCIÓN', colDesc, y);
@@ -516,9 +565,8 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
         draw(...SEP); doc.setLineWidth(0.3); doc.line(margin, y, pageW - margin, y);
         y += 4;
 
-        // Rows
         doc.setFont('helvetica', 'normal'); doc.setFontSize(9); txt(...GR9);
-        parts.forEach(p => {
+        inventoryParts.forEach((p: any) => {
           const name = p.item?.name ?? 'Pieza';
           const descLines = doc.splitTextToSize(name, descW);
           const rowH = Math.max(descLines.length * 4.5, 5);
@@ -557,8 +605,9 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
         y += total ? 7 : 5.5;
       };
 
-      cobroRow('Mano de obra', fmt(repair.laborCost));
-      if (partsTotal > 0) cobroRow('Piezas', fmt(partsTotal));
+      if (repair.diagnosisFee > 0) cobroRow('Diagnóstico', fmt(repair.diagnosisFee));
+      if (serviceTotal > 0) cobroRow('Mano de obra', fmt(serviceTotal));
+      if (inventoryTotal > 0) cobroRow('Piezas', fmt(inventoryTotal));
       y += 1;
       draw(...SEP); doc.setLineWidth(0.3); doc.line(margin + 2, y, pageW - margin - 2, y);
       y += 4;
@@ -815,10 +864,10 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       }
       line();
 
-      // Costo estimado
-      secHeader('COSTO EST. MANO DE OBRA');
-      bold(10); doc.text(repair.laborCost > 0 ? fmt(repair.laborCost) : 'Por cotizar', m, y); y += 5;
-      muted(6.5); doc.text('Piezas pueden generar cargos adicionales.', m, y); y += 4;
+      // Diagnóstico estimado
+      secHeader('DIAGNÓSTICO ESTIMADO');
+      bold(10); doc.text(repair.diagnosisFee > 0 ? fmt(repair.diagnosisFee) : 'Por cotizar', m, y); y += 5;
+      muted(6.5); doc.text('Mano de obra y piezas pueden generar cargos adicionales.', m, y); y += 4;
       line();
 
       // Términos
@@ -861,9 +910,12 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
     setLoadingThermalExit(true);
     try {
       const partsRes = await fetch(`/api/repairs/${repair.id}/parts`);
-      const parts: any[] = partsRes.ok ? await partsRes.json() : [];
-      const partsTotal = parts.reduce((s: number, p: any) => s + p.unitPrice * p.quantity, 0);
-      const total      = repair.laborCost + partsTotal;
+      const allPartsT: any[] = partsRes.ok ? await partsRes.json() : [];
+      const invPartsT  = allPartsT.filter((p: any) => !p.isService);
+      const svcPartsT  = allPartsT.filter((p: any) => p.isService);
+      const invTotalT  = invPartsT.reduce((s: number, p: any) => s + p.unitPrice * p.quantity, 0);
+      const svcTotalT  = svcPartsT.reduce((s: number, p: any) => s + p.unitPrice * p.quantity, 0);
+      const total      = repair.diagnosisFee + svcTotalT + invTotalT;
       const payments   = repair.payments ?? [];
       const totalPaid  = payments.length > 0
         ? payments.reduce((s, p) => s + p.amount, 0)
@@ -920,10 +972,30 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       if (repair.serialNumber) { muted(6.5); doc.text(`N/S: ${repair.serialNumber}`, m, y); y += 3.5; }
       line();
 
-      // Piezas
-      if (parts.length > 0) {
+      // Servicios (diagnóstico + mano de obra)
+      if (repair.diagnosisFee > 0 || svcPartsT.length > 0) {
+        bold(7); doc.text('SERVICIOS', m, y); y += 4;
+        if (repair.diagnosisFee > 0) {
+          norm(7.5);
+          doc.text('Diagnóstico', m, y);
+          bold(7.5); doc.text(fmt(repair.diagnosisFee), pageW - m, y, { align: 'right' });
+          doc.setFont('helvetica', 'normal'); y += 4.5;
+        }
+        svcPartsT.forEach((p: any) => {
+          norm(7.5);
+          const nameLines = doc.splitTextToSize(p.serviceName ?? 'Mano de obra', cW - 18);
+          doc.text(nameLines, m, y);
+          bold(7.5); doc.text(fmt(p.unitPrice), pageW - m, y, { align: 'right' });
+          doc.setFont('helvetica', 'normal');
+          y += nameLines.length * 3.8 + 1.5;
+        });
+        line();
+      }
+
+      // Piezas de inventario
+      if (invPartsT.length > 0) {
         bold(7); doc.text('PIEZAS UTILIZADAS', m, y); y += 4;
-        parts.forEach(p => {
+        invPartsT.forEach((p: any) => {
           norm(7.5);
           const name = p.item?.name ?? 'Pieza';
           const nameLines = doc.splitTextToSize(`${p.quantity}× ${name}`, cW - 18);
@@ -943,8 +1015,9 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
         if (isBold) bold(8); else norm(7.5);
         doc.text(value, pageW - m, y, { align: 'right' }); y += 4.5;
       };
-      cobroRow('Mano de obra', fmt(repair.laborCost));
-      if (partsTotal > 0) cobroRow('Piezas', fmt(partsTotal));
+      if (repair.diagnosisFee > 0) cobroRow('Diagnóstico', fmt(repair.diagnosisFee));
+      if (svcTotalT > 0) cobroRow('Mano de obra', fmt(svcTotalT));
+      if (invTotalT > 0) cobroRow('Piezas', fmt(invTotalT));
       doc.setDrawColor(100, 100, 100); doc.setLineWidth(0.4);
       doc.line(m, y, pageW - m, y); y += 3;
       cobroRow('TOTAL', fmt(total), true);
