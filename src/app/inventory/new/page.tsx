@@ -43,6 +43,15 @@ export default function NewInventoryPage() {
           <Field label="Nombre *" name="name" required className="col-span-2" />
           <Field label="SKU *" name="sku" required placeholder="Ej. SCR-MBP13" />
           <div>
+            <label className="label">Tipo *</label>
+            <select name="itemType" className="select" required>
+              <option value="">Seleccionar...</option>
+              <option value="PARTS">Refacción (uso interno)</option>
+              <option value="PRODUCTS">Producto (venta mostrador)</option>
+              <option value="TOOLS">Herramienta</option>
+            </select>
+          </div>
+          <div>
             <label className="label">Categoría *</label>
             <select name="category" className="select" required>
               <option value="">Seleccionar...</option>

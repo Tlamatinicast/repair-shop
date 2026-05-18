@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { apiRequireAuth } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const { error } = await apiRequireAuth();
   if (error) return error;
-  const items = await prisma.inventoryItem.findMany({ orderBy: { name: 'asc' } });
+  const type = req.nextUrl.searchParams.get('type');
+  const items = await prisma.inventoryItem.findMany({
+    where: type ? { itemType: type } : undefined,
+    orderBy: { name: 'asc' },
+  });
   return NextResponse.json(items);
 }
 
@@ -13,8 +17,8 @@ export async function POST(req: NextRequest) {
   const { error } = await apiRequireAuth();
   if (error) return error;
   try {
-    const { name, sku, description, quantity, minQuantity, costPrice, salePrice, category, location } = await req.json();
-    if (!name || !sku || !category) return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 });
+    const { name, sku, description, quantity, minQuantity, costPrice, salePrice, category, itemType, location } = await req.json();
+    if (!name || !sku || !category || !itemType) return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 });
     const item = await prisma.inventoryItem.create({
       data: {
         name, sku,
@@ -24,6 +28,7 @@ export async function POST(req: NextRequest) {
         costPrice:   parseFloat(costPrice) || 0,
         salePrice:   parseFloat(salePrice) || 0,
         category,
+        itemType,
         location: location || null,
       },
     });

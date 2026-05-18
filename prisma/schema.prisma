@@ -84,6 +84,7 @@ model InventoryItem {
   costPrice       Float        @default(0)
   salePrice       Float        @default(0)
   category        String
+  itemType        String       @default("PARTS")
   location        String?
   repairParts     RepairPart[]
   saleItems       SaleItem[]

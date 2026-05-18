@@ -64,6 +64,14 @@ export default function EditInventoryPage() {
           <Field label="Nombre *" name="name" defaultValue={item.name} required className="col-span-2" />
           <Field label="SKU" name="sku" defaultValue={item.sku} />
           <div>
+            <label className="label">Tipo *</label>
+            <select name="itemType" className="select" defaultValue={item.itemType ?? 'PARTS'} required>
+              <option value="PARTS">Refacción (uso interno)</option>
+              <option value="PRODUCTS">Producto (venta mostrador)</option>
+              <option value="TOOLS">Herramienta</option>
+            </select>
+          </div>
+          <div>
             <label className="label">Categoría</label>
             <select name="category" className="select" defaultValue={item.category}>
               {INVENTORY_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}

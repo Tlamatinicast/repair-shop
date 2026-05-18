@@ -82,7 +82,7 @@ export default function NewSalePage() {
   const [error, setError]           = useState('');
 
   useEffect(() => {
-    fetch('/api/inventory').then(r => r.json()).then(setProducts);
+    fetch('/api/inventory?type=PRODUCTS').then(r => r.json()).then(setProducts);
     fetch('/api/customers').then(r => r.json()).then((data: Customer[]) => {
       setCustomers(data);
       if (presetCustomerId) {

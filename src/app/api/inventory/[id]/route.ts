@@ -15,7 +15,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (error) return error;
   const body = await req.json();
   const data: Record<string, any> = {};
-  const fields  = ['name', 'sku', 'description', 'category', 'location'];
+  const fields  = ['name', 'sku', 'description', 'category', 'itemType', 'location'];
   const numbers = ['quantity', 'minQuantity', 'costPrice', 'salePrice'];
   fields.forEach(f  => { if (body[f] !== undefined) data[f] = body[f] || null; });
   numbers.forEach(f => { if (body[f] !== undefined) data[f] = parseFloat(body[f]); });
