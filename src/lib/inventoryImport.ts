@@ -36,6 +36,8 @@ export function normalizeCategory(raw: string): string {
 
 export const REQUIRED_COLUMNS = ['Category', 'Name', 'Cost', 'Price', 'Quantity', 'SKU'] as const;
 
+const VALID_TYPES = ['PARTS', 'PRODUCTS', 'TOOLS'] as const;
+
 export interface ParsedRow {
   rowNumber: number;
   category: string;
@@ -45,6 +47,8 @@ export interface ParsedRow {
   price: number;
   quantity: number;
   sku: string;
+  itemType: string;
+  location: string | null;
 }
 
 export interface RowError {
@@ -85,11 +89,16 @@ export function parseExcelRows(rows: Record<string, unknown>[]): { parsed: Parse
     const rawPrice = row['Price'];
     const rawQty = row['Quantity'];
     const rawSku = row['SKU'];
+    const rawType = row['Type'];
+    const rawLocation = row['Location'];
 
     const category = String(rawCategory ?? '').trim();
     const name = String(rawName ?? '').trim();
     const sku = String(rawSku ?? '').trim();
     const description = rawDesc == null ? null : String(rawDesc).trim() || null;
+    const rawTypeStr = String(rawType ?? '').trim().toUpperCase();
+    const itemType = (VALID_TYPES as readonly string[]).includes(rawTypeStr) ? rawTypeStr : 'PARTS';
+    const location = rawLocation == null ? null : String(rawLocation).trim() || null;
 
     const cost = toNumber(rawCost);
     const price = toNumber(rawPrice);
@@ -120,6 +129,8 @@ export function parseExcelRows(rows: Record<string, unknown>[]): { parsed: Parse
       price: price!,
       quantity: Math.trunc(quantity!),
       sku,
+      itemType,
+      location,
     });
   });
 

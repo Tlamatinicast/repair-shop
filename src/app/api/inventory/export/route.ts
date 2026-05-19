@@ -41,23 +41,25 @@ export async function GET(req: NextRequest) {
 
   // Mismas columnas que el importador → round-trip
   const rows = items.map(i => ({
-    Category: i.category,
-    Name: i.name,
+    Type:        i.itemType,
+    Category:    i.category,
+    Name:        i.name,
     Description: i.description ?? '',
-    Cost: i.costPrice,
-    Price: i.salePrice,
-    Quantity: i.quantity,
-    SKU: i.sku,
+    Cost:        i.costPrice,
+    Price:       i.salePrice,
+    Quantity:    i.quantity,
+    SKU:         i.sku,
+    Location:    i.location ?? '',
   }));
 
   const ws = XLSX.utils.json_to_sheet(rows, {
-    header: ['Category', 'Name', 'Description', 'Cost', 'Price', 'Quantity', 'SKU'],
+    header: ['Type', 'Category', 'Name', 'Description', 'Cost', 'Price', 'Quantity', 'SKU', 'Location'],
   });
 
   // Anchos cómodos
   ws['!cols'] = [
-    { wch: 22 }, { wch: 28 }, { wch: 50 },
-    { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 22 },
+    { wch: 12 }, { wch: 22 }, { wch: 28 }, { wch: 50 },
+    { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 22 }, { wch: 20 },
   ];
 
   const wb = XLSX.utils.book_new();

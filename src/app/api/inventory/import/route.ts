@@ -106,7 +106,8 @@ export async function POST(req: NextRequest) {
               costPrice: r.cost,
               salePrice: r.price,
               category: r.category,
-              location: null,
+              itemType: r.itemType,
+              location: r.location,
             },
             update: {
               name: r.name,
@@ -115,6 +116,8 @@ export async function POST(req: NextRequest) {
               costPrice: r.cost,
               salePrice: r.price,
               category: r.category,
+              itemType: r.itemType,
+              location: r.location,
             },
           });
           if (existed) updated++; else created++;
@@ -129,7 +132,8 @@ export async function POST(req: NextRequest) {
               costPrice: r.cost,
               salePrice: r.price,
               category: r.category,
-              location: null,
+              itemType: r.itemType,
+              location: r.location,
             },
           });
           created++;
