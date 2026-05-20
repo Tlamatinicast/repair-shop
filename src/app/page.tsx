@@ -4,6 +4,7 @@ import { REPAIR_STATUSES, formatCurrency, formatDate, type RepairStatus } from '
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { MobileHeader } from '@/components/MobileHeader';
 import { Plus, TrendingUp, Clock, CheckCircle, DollarSign, ArrowRight } from 'lucide-react';
+import { QrScannerButton } from '@/components/QrScannerButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,10 +53,13 @@ export default async function DashboardPage() {
           <p className="section-title mb-1">Panel de control</p>
           <h1 className="page-title">Dashboard</h1>
         </div>
-        <Link href="/repairs/new" className="btn-primary">
-          <Plus size={15} />
-          Nueva orden
-        </Link>
+        <div className="flex items-center gap-2">
+          <QrScannerButton />
+          <Link href="/repairs/new" className="btn-primary">
+            <Plus size={15} />
+            Nueva orden
+          </Link>
+        </div>
       </div>
 
       {/* Stats Grid */}
