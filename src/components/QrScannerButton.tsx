@@ -33,19 +33,12 @@ export function QrScannerButton() {
         const onError  = () => { /* ignorar errores de frame */ };
         const config   = { fps: 10, qrbox: { width: 240, height: 240 } };
 
-        try {
-          // Intento 1: exact + alta resolución → fuerza sensor principal en iOS
-          await scanner.start(
-            { facingMode: { exact: 'environment' }, width: { ideal: 3840 }, height: { ideal: 2160 } },
-            config, onDecode, onError,
-          );
-        } catch {
-          // Fallback: constraint más permisivo para dispositivos que no soportan exact
-          await scanner.start(
-            { facingMode: 'environment' },
-            config, onDecode, onError,
-          );
-        }
+        // 'ideal' nunca lanza error — es solo una sugerencia al navegador.
+        // En iOS, pedir alta resolución tiende a activar el sensor principal.
+        await scanner.start(
+          { facingMode: 'environment', width: { ideal: 3840 }, height: { ideal: 2160 } },
+          config, onDecode, onError,
+        );
 
         if (!cancelled) setScanning(true);
       } catch (e: any) {
