@@ -734,9 +734,9 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       const QRCode    = await import('qrcode');
 
       const repairUrl = `${window.location.origin}/repairs/${repair.id}`;
-      // QR con margen 0 para aprovechar al máximo el espacio en etiqueta pequeña
+      // Alta resolución para que cámaras de menor calidad puedan escanearlo
       const qrDataUrl = await QRCode.toDataURL(repairUrl, {
-        width: 256, margin: 1,
+        width: 1024, margin: 1,
         color: { dark: '#000000', light: '#ffffff' },
       });
 
@@ -749,10 +749,10 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       doc.setFillColor(255, 255, 255);
       doc.rect(0, 0, W, H, 'F');
 
-      // ── QR — lado derecho, 16×16mm, centrado verticalmente ──────────────
-      const QR_SIZE = 16;
-      const QR_X   = W - 1.5 - QR_SIZE;   // 22.5mm desde izq.
-      const QR_Y   = (H - QR_SIZE) / 2;   // 7mm desde arriba (centrado)
+      // ── QR — lado derecho, 18×18mm, centrado verticalmente ──────────────
+      const QR_SIZE = 18;
+      const QR_X   = W - 1 - QR_SIZE;     // 21mm desde izq.
+      const QR_Y   = (H - QR_SIZE) / 2;   // 6mm desde arriba (centrado)
       doc.addImage(qrDataUrl, 'PNG', QR_X, QR_Y, QR_SIZE, QR_SIZE);
 
 

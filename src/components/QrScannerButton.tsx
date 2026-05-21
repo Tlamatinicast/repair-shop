@@ -29,14 +29,24 @@ export function QrScannerButton() {
         const scanner = new Html5Qrcode(CONTAINER_ID);
         scannerRef.current = scanner;
 
-        await scanner.start(
-          { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 240, height: 240 } },
-          (decoded: string) => {
-            handleDecoded(decoded, scanner);
-          },
-          () => { /* ignorar errores de frame */ },
-        );
+        const onDecode = (decoded: string) => handleDecoded(decoded, scanner);
+        const onError  = () => { /* ignorar errores de frame */ };
+        const config   = { fps: 10, qrbox: { width: 240, height: 240 } };
+
+        try {
+          // Intento 1: exact + alta resolución → fuerza sensor principal en iOS
+          await scanner.start(
+            { facingMode: { exact: 'environment' }, width: { ideal: 3840 }, height: { ideal: 2160 } },
+            config, onDecode, onError,
+          );
+        } catch {
+          // Fallback: constraint más permisivo para dispositivos que no soportan exact
+          await scanner.start(
+            { facingMode: 'environment' },
+            config, onDecode, onError,
+          );
+        }
+
         if (!cancelled) setScanning(true);
       } catch (e: any) {
         if (!cancelled) setError('No se pudo acceder a la cámara. Verifica los permisos.');
