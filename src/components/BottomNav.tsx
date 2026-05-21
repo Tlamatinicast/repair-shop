@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Wrench, Users, ShoppingBag, Package, Calculator, FileText } from 'lucide-react';
+import { LayoutDashboard, Wrench, Users, ShoppingBag, Package, Calculator, FileText, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const allNav = [
@@ -12,6 +12,7 @@ const allNav = [
   { href: '/customers',      label: 'Clientes',      icon: Users,           adminOnly: false },
   { href: '/inventory',      label: 'Stock',         icon: Package,         adminOnly: false },
   { href: '/quotes',         label: 'Cotizaciones',  icon: FileText,        adminOnly: false },
+  { href: '/expenses',       label: 'Gastos',        icon: TrendingDown,    adminOnly: false },
   { href: '/corte-de-caja',  label: 'Corte',         icon: Calculator,      adminOnly: true  },
 ];
 
