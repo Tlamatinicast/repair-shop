@@ -1,25 +1,33 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { CalendarDays, X } from 'lucide-react';
 
-export function DateFilter({ date, today }: { date: string; today: string }) {
+export function DateFilter({ dateFilter, today }: { dateFilter: string | null; today: string }) {
   const router = useRouter();
 
   return (
-    <div className="flex items-center gap-3 mb-5">
-      <label className="text-xs text-[#666] font-mono">Fecha:</label>
+    <div className="flex items-center gap-2 mb-5">
+      <div className="flex items-center gap-2 text-[#555]">
+        <CalendarDays size={14} />
+        <label className="text-xs text-[#666] font-mono">Filtrar por día:</label>
+      </div>
       <input
         type="date"
-        defaultValue={date}
+        value={dateFilter ?? ''}
         className="input max-w-44"
-        onChange={e => router.push(`/sales?date=${e.target.value}`)}
+        onChange={e => {
+          if (e.target.value) router.push(`/sales?date=${e.target.value}`);
+          else router.push('/sales');
+        }}
       />
-      {date !== today && (
+      {dateFilter && (
         <button
           onClick={() => router.push('/sales')}
-          className="text-xs text-amber-500 hover:text-amber-400 font-mono"
+          className="flex items-center gap-1 text-xs text-amber-500 hover:text-amber-400 font-mono transition-colors"
+          title="Quitar filtro"
         >
-          Hoy
+          <X size={12} /> Todas
         </button>
       )}
     </div>

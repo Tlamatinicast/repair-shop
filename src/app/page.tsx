@@ -3,18 +3,25 @@ import { prisma } from '@/lib/prisma';
 import { REPAIR_STATUSES, formatCurrency, formatDate, type RepairStatus } from '@/lib/utils';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { MobileHeader } from '@/components/MobileHeader';
-import { Plus, TrendingUp, Clock, CheckCircle, DollarSign, ArrowRight } from 'lucide-react';
+import { Plus, TrendingUp, Clock, CheckCircle, DollarSign, ArrowRight, TrendingDown, Scale } from 'lucide-react';
 import { QrScannerButton } from '@/components/QrScannerButton';
 
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
+  // Rango del mes actual
+  const now    = new Date();
+  const mStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const mEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
   const [
     totalRepairs,
     activeRepairs,
     readyRepairs,
     recentRepairs,
-    lowStock,
+    monthRepairIncome,
+    monthSaleIncome,
+    monthExpenses,
   ] = await Promise.all([
     prisma.repair.count(),
     prisma.repair.count({ where: { status: { in: ['RECEIVED', 'DIAGNOSING', 'WAITING_PARTS', 'IN_REPAIR'] } } }),
@@ -24,11 +31,14 @@ export default async function DashboardPage() {
       orderBy: { createdAt: 'desc' },
       include: { customer: true },
     }),
-    prisma.inventoryItem.findMany({
-      where: { quantity: { lte: prisma.inventoryItem.fields.minQuantity } },
-      take: 3,
-    }).catch(() => []),
+    prisma.repairPayment.aggregate({ _sum: { amount: true }, where: { createdAt: { gte: mStart, lte: mEnd } } }),
+    prisma.salePayment.aggregate(  { _sum: { amount: true }, where: { createdAt: { gte: mStart, lte: mEnd } } }),
+    prisma.expense.aggregate(      { _sum: { amount: true }, where: { date:      { gte: mStart, lte: mEnd } } }),
   ]);
+
+  const monthIncome  = (monthRepairIncome._sum.amount ?? 0) + (monthSaleIncome._sum.amount ?? 0);
+  const monthExpense = monthExpenses._sum.amount ?? 0;
+  const monthProfit  = monthIncome - monthExpense;
 
   const revenue = await prisma.repair.aggregate({
     _sum: { totalCost: true },
@@ -42,6 +52,8 @@ export default async function DashboardPage() {
 
   const statusMap: Record<string, number> = {};
   statusCounts.forEach(s => { statusMap[s.status] = s._count; });
+
+  const monthLabel = new Intl.DateTimeFormat('es-MX', { month: 'long', timeZone: 'America/Mexico_City' }).format(now);
 
   return (
     <div className="min-h-screen">
@@ -150,6 +162,39 @@ export default async function DashboardPage() {
               {Object.values(statusMap).every(v => v === 0) && (
                 <p className="text-xs text-[#555]">Sin datos</p>
               )}
+            </div>
+          </div>
+
+          {/* Balance del mes */}
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-[#ccc]">Balance — <span className="capitalize text-[#666]">{monthLabel}</span></h2>
+              <Link href="/reports" className="text-[10px] text-amber-500 hover:text-amber-400">Ver más →</Link>
+            </div>
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-green-400">
+                  <TrendingUp size={12} />
+                  <span className="text-xs text-[#777]">Ingresos</span>
+                </div>
+                <span className="font-mono text-xs text-green-400">{formatCurrency(monthIncome)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-red-400">
+                  <TrendingDown size={12} />
+                  <span className="text-xs text-[#777]">Gastos</span>
+                </div>
+                <span className="font-mono text-xs text-red-400">-{formatCurrency(monthExpense)}</span>
+              </div>
+              <div className="border-t border-[#1e1e1e] pt-2.5 flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Scale size={12} className={monthProfit >= 0 ? 'text-amber-400' : 'text-red-400'} />
+                  <span className="text-xs text-[#888] font-medium">Utilidad</span>
+                </div>
+                <span className={`font-mono text-sm font-semibold ${monthProfit >= 0 ? 'text-amber-400' : 'text-red-400'}`}>
+                  {formatCurrency(monthProfit)}
+                </span>
+              </div>
             </div>
           </div>
 
