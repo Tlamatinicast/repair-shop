@@ -749,64 +749,66 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       doc.setFillColor(255, 255, 255);
       doc.rect(0, 0, W, H, 'F');
 
-      // ── QR — lado derecho, 18×18mm, centrado verticalmente ──────────────
-      const QR_SIZE = 18;
-      const QR_X   = W - 1 - QR_SIZE;     // 21mm desde izq.
-      const QR_Y   = (H - QR_SIZE) / 2;   // 6mm desde arriba (centrado)
+      // ── Distribución: 40% texto | 60% QR ────────────────────────────────
+      const m       = 1.5;
+      const DIVIDER = W * 0.40;          // 16mm — frontera texto/QR
+      const textW   = DIVIDER - m - 0.5; // ~14mm de texto útil
+
+      // QR: 60% del ancho, cuadrado, centrado verticalmente
+      const QR_SIZE = W * 0.58;          // 23.2mm → ocupa casi todo el 60%
+      const QR_X    = DIVIDER + 0.5;
+      const QR_Y    = (H - QR_SIZE) / 2; // centrado vertical
       doc.addImage(qrDataUrl, 'PNG', QR_X, QR_Y, QR_SIZE, QR_SIZE);
 
-
-      // Línea divisoria vertical entre texto y QR
+      // Línea divisoria vertical
       doc.setDrawColor(210, 210, 210);
       doc.setLineWidth(0.2);
-      doc.line(QR_X - 1, 2, QR_X - 1, H - 2);
+      doc.line(DIVIDER, 2, DIVIDER, H - 2);
 
-      // ── Contenido izquierdo (ancho útil ≈ 19.5mm) ───────────────────────
-      const m    = 1.5;
+      // ── Texto: 6 elementos distribuidos en los 30mm de altura ────────────
+      // Posiciones calculadas para llenar verticalmente el 40% izquierdo
 
-      // Nombre del negocio
+      // 1. Nombre del negocio (arriba)
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(5);
-      doc.setTextColor(80, 80, 80);
-      const bizName = biz.name.length > 22 ? biz.name.substring(0, 21) + '…' : biz.name;
-      doc.text(bizName, m, m + 3);
+      doc.setTextColor(100, 100, 100);
+      const bizName = doc.splitTextToSize(biz.name, textW)[0];
+      doc.text(bizName, m, 4.5);
 
-      // Número de ticket (elemento principal)
+      // 2. Número de ticket — elemento principal
       doc.setFont('courier', 'bold');
       doc.setFontSize(9.5);
       doc.setTextColor(0, 0, 0);
-      doc.text(repair.ticketNumber, m, m + 8.5);
+      doc.text(repair.ticketNumber, m, 10);
 
-      // Línea separadora horizontal
-      doc.setDrawColor(200, 200, 200);
+      // 3. Línea separadora
+      doc.setDrawColor(180, 180, 180);
       doc.setLineWidth(0.25);
-      doc.line(m, m + 10.5, QR_X - 2, m + 10.5);
+      doc.line(m, 12, DIVIDER - 1, 12);
 
-      // Nombre del cliente
+      // 4. Nombre del cliente
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(5.5);
-      doc.setTextColor(30, 30, 30);
-      const clientShort = repair.customer.name.length > 21
-        ? repair.customer.name.substring(0, 20) + '…'
-        : repair.customer.name;
-      doc.text(clientShort, m, m + 14);
+      doc.setTextColor(20, 20, 20);
+      const clientShort = doc.splitTextToSize(repair.customer.name, textW)[0];
+      doc.text(clientShort, m, 16);
 
-      // Marca + modelo del dispositivo
+      // 5. Marca + modelo
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(5);
-      doc.setTextColor(90, 90, 90);
-      const deviceStr = `${repair.deviceBrand} ${repair.deviceModel}`;
-      const deviceShort = deviceStr.length > 23 ? deviceStr.substring(0, 22) + '…' : deviceStr;
-      doc.text(deviceShort, m, m + 18);
+      doc.setTextColor(80, 80, 80);
+      const deviceStr   = `${repair.deviceBrand} ${repair.deviceModel}`;
+      const deviceShort = doc.splitTextToSize(deviceStr, textW)[0];
+      doc.text(deviceShort, m, 20.5);
 
-      // Tipo de dispositivo + fecha
+      // 6. Tipo + fecha (abajo)
       doc.setFontSize(4.5);
-      doc.setTextColor(140, 140, 140);
+      doc.setTextColor(130, 130, 130);
       const fechaLabel = new Date(repair.createdAt).toLocaleDateString('es-MX', {
         day: '2-digit', month: 'short', year: '2-digit', timeZone: 'America/Mexico_City',
       });
       const typeLabel = repair.deviceType.toUpperCase();
-      doc.text(`${typeLabel} · ${fechaLabel}`, m, m + 21.5);
+      doc.text(`${typeLabel} · ${fechaLabel}`, m, 25.5);
 
 
       window.open(doc.output('bloburl'), '_blank');
