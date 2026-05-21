@@ -755,11 +755,6 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       const QR_Y   = (H - QR_SIZE) / 2;   // 7mm desde arriba (centrado)
       doc.addImage(qrDataUrl, 'PNG', QR_X, QR_Y, QR_SIZE, QR_SIZE);
 
-      // Texto bajo QR
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(4);
-      doc.setTextColor(120, 120, 120);
-      doc.text('Escanear', QR_X + QR_SIZE / 2, QR_Y + QR_SIZE + 2, { align: 'center' });
 
       // Línea divisoria vertical entre texto y QR
       doc.setDrawColor(210, 210, 210);
@@ -813,10 +808,6 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       const typeLabel = repair.deviceType.toUpperCase();
       doc.text(`${typeLabel} · ${fechaLabel}`, m, m + 21.5);
 
-      // ── Borde negro fino ─────────────────────────────────────────────────
-      doc.setDrawColor(0, 0, 0);
-      doc.setLineWidth(0.4);
-      doc.rect(0.2, 0.2, W - 0.4, H - 0.4);
 
       window.open(doc.output('bloburl'), '_blank');
     } catch (err) { console.error(err); alert('Error al generar la etiqueta.'); }
