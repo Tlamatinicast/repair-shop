@@ -745,8 +745,8 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [H, W] });
       // jsPDF con landscape invierte: format[0]=corto, format[1]=largo → 30×40 → landscape = 40×30 ✓
 
-      // ── Fondo negro total ────────────────────────────────────────────────
-      doc.setFillColor(10, 10, 10);
+      // ── Fondo blanco ─────────────────────────────────────────────────────
+      doc.setFillColor(255, 255, 255);
       doc.rect(0, 0, W, H, 'F');
 
       // ── QR — lado derecho, 16×16mm, centrado verticalmente ──────────────
@@ -758,35 +758,39 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       // Texto bajo QR
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(4);
-      doc.setTextColor(70, 70, 70);
+      doc.setTextColor(120, 120, 120);
       doc.text('Escanear', QR_X + QR_SIZE / 2, QR_Y + QR_SIZE + 2, { align: 'center' });
+
+      // Línea divisoria vertical entre texto y QR
+      doc.setDrawColor(210, 210, 210);
+      doc.setLineWidth(0.2);
+      doc.line(QR_X - 1, 2, QR_X - 1, H - 2);
 
       // ── Contenido izquierdo (ancho útil ≈ 19.5mm) ───────────────────────
       const m    = 1.5;
-      const leftW = QR_X - m - 1;   // ≈ 20mm
 
       // Nombre del negocio
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(5);
-      doc.setTextColor(251, 191, 36);
+      doc.setTextColor(80, 80, 80);
       const bizName = biz.name.length > 22 ? biz.name.substring(0, 21) + '…' : biz.name;
       doc.text(bizName, m, m + 3);
 
       // Número de ticket (elemento principal)
       doc.setFont('courier', 'bold');
       doc.setFontSize(9.5);
-      doc.setTextColor(255, 255, 255);
+      doc.setTextColor(0, 0, 0);
       doc.text(repair.ticketNumber, m, m + 8.5);
 
-      // Línea separadora
-      doc.setDrawColor(35, 35, 35);
+      // Línea separadora horizontal
+      doc.setDrawColor(200, 200, 200);
       doc.setLineWidth(0.25);
-      doc.line(m, m + 10.5, QR_X - 1, m + 10.5);
+      doc.line(m, m + 10.5, QR_X - 2, m + 10.5);
 
       // Nombre del cliente
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(5.5);
-      doc.setTextColor(210, 210, 210);
+      doc.setTextColor(30, 30, 30);
       const clientShort = repair.customer.name.length > 21
         ? repair.customer.name.substring(0, 20) + '…'
         : repair.customer.name;
@@ -795,22 +799,22 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       // Marca + modelo del dispositivo
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(5);
-      doc.setTextColor(130, 130, 130);
+      doc.setTextColor(90, 90, 90);
       const deviceStr = `${repair.deviceBrand} ${repair.deviceModel}`;
       const deviceShort = deviceStr.length > 23 ? deviceStr.substring(0, 22) + '…' : deviceStr;
       doc.text(deviceShort, m, m + 18);
 
       // Tipo de dispositivo + fecha
       doc.setFontSize(4.5);
-      doc.setTextColor(75, 75, 75);
+      doc.setTextColor(140, 140, 140);
       const fechaLabel = new Date(repair.createdAt).toLocaleDateString('es-MX', {
         day: '2-digit', month: 'short', year: '2-digit', timeZone: 'America/Mexico_City',
       });
       const typeLabel = repair.deviceType.toUpperCase();
       doc.text(`${typeLabel} · ${fechaLabel}`, m, m + 21.5);
 
-      // ── Borde ámbar ──────────────────────────────────────────────────────
-      doc.setDrawColor(251, 191, 36);
+      // ── Borde negro fino ─────────────────────────────────────────────────
+      doc.setDrawColor(0, 0, 0);
       doc.setLineWidth(0.4);
       doc.rect(0.2, 0.2, W - 0.4, H - 0.4);
 
