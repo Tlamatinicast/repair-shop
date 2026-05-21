@@ -726,39 +726,93 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
     finally { setLoadingDelivery(false); }
   };
 
-  // ── INTERNAL LABEL (100×70mm + QR) ───────────────────────────────────────
+  // ── INTERNAL LABEL (40×30mm landscape + QR) ─────────────────────────────
   const generateInternalTicket = async () => {
     setLoadingInternal(true);
     try {
       const { jsPDF } = await import('jspdf');
-      const QRCode = await import('qrcode');
-      const repairUrl = `${window.location.origin}/repairs/${repair.id}`;
-      const qrDataUrl = await QRCode.toDataURL(repairUrl, { width: 200, margin: 1, color: { dark: '#000000', light: '#ffffff' } });
-      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [100, 70] });
+      const QRCode    = await import('qrcode');
 
-      doc.setFillColor(10, 10, 10); doc.rect(0, 0, 100, 70, 'F');
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(251, 191, 36);
-      doc.text(biz.name, 5, 8);
-      doc.setFont('courier', 'bold'); doc.setFontSize(22); doc.setTextColor(255, 255, 255);
-      doc.text(repair.ticketNumber, 5, 22);
-      doc.setDrawColor(40, 40, 40); doc.line(5, 25, 68, 25);
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(220, 220, 220);
-      const clientLines = doc.splitTextToSize(repair.customer.name, 62);
-      doc.text(clientLines, 5, 32);
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(160, 160, 160);
-      const deviceLines = doc.splitTextToSize(`${repair.deviceBrand} ${repair.deviceModel}`, 62);
-      doc.text(deviceLines, 5, 40);
-      doc.setFillColor(30, 30, 30); doc.roundedRect(5, 44, 30, 6, 1, 1, 'F');
-      doc.setFontSize(6.5); doc.setTextColor(150, 150, 150);
-      doc.text(repair.deviceType.toUpperCase(), 20, 48.5, { align: 'center' });
-      doc.setFontSize(6); doc.setTextColor(80, 80, 80);
-      doc.text(new Date(repair.createdAt).toLocaleDateString('es-MX'), 5, 57);
-      doc.text('ESCANEAR PARA VER ORDEN', 5, 63);
-      doc.addImage(qrDataUrl, 'PNG', 68, 4, 28, 28);
-      doc.setFontSize(5.5); doc.setTextColor(80, 80, 80);
-      doc.text('Abrir en sistema', 82, 35, { align: 'center' });
-      doc.setDrawColor(251, 191, 36); doc.setLineWidth(0.8);
-      doc.rect(0.4, 0.4, 99.2, 69.2);
+      const repairUrl = `${window.location.origin}/repairs/${repair.id}`;
+      // QR con margen 0 para aprovechar al máximo el espacio en etiqueta pequeña
+      const qrDataUrl = await QRCode.toDataURL(repairUrl, {
+        width: 256, margin: 1,
+        color: { dark: '#000000', light: '#ffffff' },
+      });
+
+      // 40mm ancho × 30mm alto (landscape)
+      const W = 40; const H = 30;
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [H, W] });
+      // jsPDF con landscape invierte: format[0]=corto, format[1]=largo → 30×40 → landscape = 40×30 ✓
+
+      // ── Fondo negro total ────────────────────────────────────────────────
+      doc.setFillColor(10, 10, 10);
+      doc.rect(0, 0, W, H, 'F');
+
+      // ── QR — lado derecho, 16×16mm, centrado verticalmente ──────────────
+      const QR_SIZE = 16;
+      const QR_X   = W - 1.5 - QR_SIZE;   // 22.5mm desde izq.
+      const QR_Y   = (H - QR_SIZE) / 2;   // 7mm desde arriba (centrado)
+      doc.addImage(qrDataUrl, 'PNG', QR_X, QR_Y, QR_SIZE, QR_SIZE);
+
+      // Texto bajo QR
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(4);
+      doc.setTextColor(70, 70, 70);
+      doc.text('Escanear', QR_X + QR_SIZE / 2, QR_Y + QR_SIZE + 2, { align: 'center' });
+
+      // ── Contenido izquierdo (ancho útil ≈ 19.5mm) ───────────────────────
+      const m    = 1.5;
+      const leftW = QR_X - m - 1;   // ≈ 20mm
+
+      // Nombre del negocio
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(5);
+      doc.setTextColor(251, 191, 36);
+      const bizName = biz.name.length > 22 ? biz.name.substring(0, 21) + '…' : biz.name;
+      doc.text(bizName, m, m + 3);
+
+      // Número de ticket (elemento principal)
+      doc.setFont('courier', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(255, 255, 255);
+      doc.text(repair.ticketNumber, m, m + 8.5);
+
+      // Línea separadora
+      doc.setDrawColor(35, 35, 35);
+      doc.setLineWidth(0.25);
+      doc.line(m, m + 10.5, QR_X - 1, m + 10.5);
+
+      // Nombre del cliente
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(5.5);
+      doc.setTextColor(210, 210, 210);
+      const clientShort = repair.customer.name.length > 21
+        ? repair.customer.name.substring(0, 20) + '…'
+        : repair.customer.name;
+      doc.text(clientShort, m, m + 14);
+
+      // Marca + modelo del dispositivo
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(5);
+      doc.setTextColor(130, 130, 130);
+      const deviceStr = `${repair.deviceBrand} ${repair.deviceModel}`;
+      const deviceShort = deviceStr.length > 23 ? deviceStr.substring(0, 22) + '…' : deviceStr;
+      doc.text(deviceShort, m, m + 18);
+
+      // Tipo de dispositivo + fecha
+      doc.setFontSize(4.5);
+      doc.setTextColor(75, 75, 75);
+      const fechaLabel = new Date(repair.createdAt).toLocaleDateString('es-MX', {
+        day: '2-digit', month: 'short', year: '2-digit', timeZone: 'America/Mexico_City',
+      });
+      const typeLabel = repair.deviceType.toUpperCase();
+      doc.text(`${typeLabel} · ${fechaLabel}`, m, m + 21.5);
+
+      // ── Borde ámbar ──────────────────────────────────────────────────────
+      doc.setDrawColor(251, 191, 36);
+      doc.setLineWidth(0.4);
+      doc.rect(0.2, 0.2, W - 0.4, H - 0.4);
 
       window.open(doc.output('bloburl'), '_blank');
     } catch (err) { console.error(err); alert('Error al generar la etiqueta.'); }
