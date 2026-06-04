@@ -1272,10 +1272,13 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       // ── SECCIÓN: DIAGNÓSTICO TÉCNICO ──────────────────────────────────────
       sLabel('Diagnóstico técnico');
 
+      // Ancho seguro para texto indentado (margen + 6mm de sangría)
+      const noteTextW = contentW - 14;
+
       // Campo diagnosis de la orden (texto directo del técnico)
       if (repair.diagnosis && repair.diagnosis.trim()) {
-        const dLines = doc.splitTextToSize(repair.diagnosis.trim(), contentW - 6);
-        const dH     = dLines.length * 4.5 + 8;
+        const dLines = doc.splitTextToSize(repair.diagnosis.trim(), noteTextW);
+        const dH     = dLines.length * 5 + 8;
         fill(...PROB_BG); doc.rect(margin, y - 2, contentW, dH, 'F');
         fill(...TEAL_D);  doc.rect(margin, y - 2, 2, dH, 'F');
         doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); txt(...GR9);
@@ -1300,8 +1303,8 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
           y += 4.5;
 
           // Contenido de la nota
-          const noteLines = doc.splitTextToSize(note.content, contentW - 6);
-          const noteH     = noteLines.length * 4.5 + 8;
+          const noteLines = doc.splitTextToSize(note.content, noteTextW);
+          const noteH     = noteLines.length * 5 + 8;
           fill(...PROB_BG); doc.rect(margin, y - 2, contentW, noteH, 'F');
           fill(...TEAL_D);  doc.rect(margin, y - 2, 2, noteH, 'F');
           doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); txt(...GR9);
