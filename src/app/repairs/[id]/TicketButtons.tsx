@@ -1277,11 +1277,11 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
 
       // Campo diagnosis de la orden (texto directo del técnico)
       if (repair.diagnosis && repair.diagnosis.trim()) {
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); txt(...GR9);
         const dLines = doc.splitTextToSize(repair.diagnosis.trim(), noteTextW);
         const dH     = dLines.length * 5 + 8;
         fill(...PROB_BG); doc.rect(margin, y - 2, contentW, dH, 'F');
         fill(...TEAL_D);  doc.rect(margin, y - 2, 2, dH, 'F');
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); txt(...GR9);
         doc.text(dLines, margin + 6, y + 3);
         y += dH + 5;
       }
@@ -1303,11 +1303,11 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
           y += 4.5;
 
           // Contenido de la nota
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); txt(...GR9);
           const noteLines = doc.splitTextToSize(note.content, noteTextW);
           const noteH     = noteLines.length * 5 + 8;
           fill(...PROB_BG); doc.rect(margin, y - 2, contentW, noteH, 'F');
           fill(...TEAL_D);  doc.rect(margin, y - 2, 2, noteH, 'F');
-          doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); txt(...GR9);
           doc.text(noteLines, margin + 6, y + 3);
           y += noteH + 3;
 
