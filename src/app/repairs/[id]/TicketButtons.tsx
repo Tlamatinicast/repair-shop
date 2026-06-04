@@ -1159,10 +1159,8 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       const allNotes: any[] = notesRes.ok ? await notesRes.json() : [];
       const allParts: any[] = partsRes.ok ? await partsRes.json() : [];
 
-      // Solo notas en etapa DIAGNOSING, más recientes primero → mostrar en orden cronológico
-      const diagNotes = allNotes
-        .filter((n: any) => n.stage === 'DIAGNOSING')
-        .reverse();
+      // Todas las notas en orden cronológico
+      const diagNotes = [...allNotes].reverse();
 
       const inventoryParts = allParts.filter((p: any) => !p.isService);
       const serviceParts   = allParts.filter((p: any) => p.isService);
@@ -1273,7 +1271,24 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
 
       // ── SECCIÓN: DIAGNÓSTICO TÉCNICO ──────────────────────────────────────
       sLabel('Diagnóstico técnico');
+
+      // Campo diagnosis de la orden (texto directo del técnico)
+      if (repair.diagnosis && repair.diagnosis.trim()) {
+        const dLines = doc.splitTextToSize(repair.diagnosis.trim(), contentW - 6);
+        const dH     = dLines.length * 4.5 + 8;
+        fill(...PROB_BG); doc.rect(margin, y - 2, contentW, dH, 'F');
+        fill(...TEAL_D);  doc.rect(margin, y - 2, 2, dH, 'F');
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); txt(...GR9);
+        doc.text(dLines, margin + 6, y + 3);
+        y += dH + 5;
+      }
+
+      // Notas del timeline (todas)
       if (diagNotes.length > 0) {
+        if (repair.diagnosis?.trim()) {
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); txt(...GR4);
+          doc.text('NOTAS DEL PROCESO', margin, y); y += 5;
+        }
         diagNotes.forEach((note: any, i: number) => {
           // Fecha + autor
           const noteDate = new Date(note.createdAt).toLocaleString('es-MX', {
@@ -1299,9 +1314,9 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
             y += 4;
           }
         });
-      } else {
+      } else if (!repair.diagnosis?.trim()) {
         doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); txt(...GR4);
-        doc.text('Sin notas de diagnóstico registradas.', margin, y);
+        doc.text('Sin diagnóstico registrado todavía.', margin, y);
         y += 8;
       }
       y += 2;
