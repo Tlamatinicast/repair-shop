@@ -1159,8 +1159,10 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       const allNotes: any[] = notesRes.ok ? await notesRes.json() : [];
       const allParts: any[] = partsRes.ok ? await partsRes.json() : [];
 
-      // Todas las notas en orden cronológico
-      const diagNotes = [...allNotes].reverse();
+      // Notas excluyendo la de recepción, en orden cronológico
+      const diagNotes = [...allNotes]
+        .filter((n: any) => n.stage !== 'RECEIVED')
+        .reverse();
 
       const inventoryParts = allParts.filter((p: any) => !p.isService);
       const serviceParts   = allParts.filter((p: any) => p.isService);
