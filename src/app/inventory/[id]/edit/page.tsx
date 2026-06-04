@@ -11,15 +11,24 @@ export default function EditInventoryPage() {
   const params = useParams();
   const id = params.id as string;
 
-  const [item, setItem] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [item, setItem]           = useState<any>(null);
+  const [loading, setLoading]     = useState(true);
+  const [saving, setSaving]       = useState(false);
+  const [error, setError]         = useState('');
+  const [customCat, setCustomCat] = useState(false);
+  const [categoryVal, setCategoryVal] = useState('');
 
   useEffect(() => {
     fetch(`/api/inventory/${id}`)
       .then(r => r.json())
-      .then(data => { setItem(data); setLoading(false); });
+      .then(data => {
+        setItem(data);
+        setCategoryVal(data.category ?? '');
+        // Si la categoría guardada no está en la lista predefinida, abrir modo libre
+        const known = INVENTORY_CATEGORIES as readonly string[];
+        if (data.category && !known.includes(data.category)) setCustomCat(true);
+        setLoading(false);
+      });
   }, [id]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -73,9 +82,37 @@ export default function EditInventoryPage() {
           </div>
           <div>
             <label className="label">Categoría</label>
-            <select name="category" className="select" defaultValue={item.category}>
-              {INVENTORY_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+            {customCat ? (
+              <div className="flex gap-1.5">
+                <input
+                  name="category"
+                  value={categoryVal}
+                  onChange={e => setCategoryVal(e.target.value)}
+                  className="input flex-1"
+                  placeholder="Nueva categoría..."
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => { setCustomCat(false); setCategoryVal(item.category ?? ''); }}
+                  className="btn-ghost text-xs px-2"
+                >✕</button>
+              </div>
+            ) : (
+              <select
+                name="category"
+                className="select"
+                value={categoryVal}
+                onChange={e => {
+                  if (e.target.value === '__OTHER__') { setCustomCat(true); setCategoryVal(''); }
+                  else setCategoryVal(e.target.value);
+                }}
+              >
+                <option value="">Seleccionar...</option>
+                {INVENTORY_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                <option value="__OTHER__">✏ Otra categoría...</option>
+              </select>
+            )}
           </div>
           <Field label="Stock actual" name="quantity" type="number" defaultValue={String(item.quantity)} />
           <Field label="Stock mínimo" name="minQuantity" type="number" defaultValue={String(item.minQuantity)} />

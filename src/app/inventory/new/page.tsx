@@ -8,8 +8,10 @@ import { INVENTORY_CATEGORIES } from '@/lib/utils';
 
 export default function NewInventoryPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState('');
+  const [customCat, setCustomCat]     = useState(false);
+  const [categoryVal, setCategoryVal] = useState('');
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -53,10 +55,39 @@ export default function NewInventoryPage() {
           </div>
           <div>
             <label className="label">Categoría *</label>
-            <select name="category" className="select" required>
-              <option value="">Seleccionar...</option>
-              {INVENTORY_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+            {customCat ? (
+              <div className="flex gap-1.5">
+                <input
+                  name="category"
+                  value={categoryVal}
+                  onChange={e => setCategoryVal(e.target.value)}
+                  className="input flex-1"
+                  placeholder="Nueva categoría..."
+                  required
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => { setCustomCat(false); setCategoryVal(''); }}
+                  className="btn-ghost text-xs px-2"
+                >✕</button>
+              </div>
+            ) : (
+              <select
+                name="category"
+                className="select"
+                required
+                value={categoryVal}
+                onChange={e => {
+                  if (e.target.value === '__OTHER__') { setCustomCat(true); setCategoryVal(''); }
+                  else setCategoryVal(e.target.value);
+                }}
+              >
+                <option value="">Seleccionar...</option>
+                {INVENTORY_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                <option value="__OTHER__">✏ Otra categoría...</option>
+              </select>
+            )}
           </div>
           <Field label="Stock inicial" name="quantity" type="number" defaultValue="0" />
           <Field label="Stock mínimo" name="minQuantity" type="number" defaultValue="1" />

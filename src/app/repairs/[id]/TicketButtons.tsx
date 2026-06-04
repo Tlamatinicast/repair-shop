@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Printer, Tag, FileCheck, Loader2 } from 'lucide-react';
+import { Printer, Tag, FileCheck, Loader2, Stethoscope } from 'lucide-react';
 
 interface Repair {
   id: number;
@@ -66,6 +66,7 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
   const [loadingDelivery,      setLoadingDelivery]      = useState(false);
   const [loadingThermalEntry,  setLoadingThermalEntry]  = useState(false);
   const [loadingThermalExit,   setLoadingThermalExit]   = useState(false);
+  const [loadingDiagnosis,     setLoadingDiagnosis]     = useState(false);
 
   // ── CLIENT TICKET — estilo teal moderno ──────────────────────────────────
   const generateClientTicket = async () => {
@@ -1146,6 +1147,243 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
     finally { setLoadingThermalExit(false); }
   };
 
+  // ── REPORTE DE DIAGNÓSTICO (A4, solo en DIAGNOSING) ─────────────────────────
+  const generateDiagnosisReport = async () => {
+    setLoadingDiagnosis(true);
+    try {
+      // Fetch notas de diagnóstico y piezas cotizadas en paralelo
+      const [notesRes, partsRes] = await Promise.all([
+        fetch(`/api/repairs/${repair.id}/notes`),
+        fetch(`/api/repairs/${repair.id}/parts`),
+      ]);
+      const allNotes: any[] = notesRes.ok ? await notesRes.json() : [];
+      const allParts: any[] = partsRes.ok ? await partsRes.json() : [];
+
+      // Solo notas en etapa DIAGNOSING, más recientes primero → mostrar en orden cronológico
+      const diagNotes = allNotes
+        .filter((n: any) => n.stage === 'DIAGNOSING')
+        .reverse();
+
+      const inventoryParts = allParts.filter((p: any) => !p.isService);
+      const serviceParts   = allParts.filter((p: any) => p.isService);
+      const inventoryTotal = inventoryParts.reduce((s: number, p: any) => s + p.unitPrice * p.quantity, 0);
+      const serviceTotal   = serviceParts.reduce((s: number, p: any) => s + p.unitPrice * p.quantity, 0);
+      const estimatedTotal = repair.diagnosisFee + serviceTotal + inventoryTotal;
+
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageW = 210; const margin = 18; const contentW = pageW - margin * 2;
+
+      // ── Paleta (igual que los otros tickets) ─────────────────────────────
+      const fill = (r: number, g: number, b: number) => doc.setFillColor(r, g, b);
+      const draw = (r: number, g: number, b: number) => doc.setDrawColor(r, g, b);
+      const txt  = (r: number, g: number, b: number) => doc.setTextColor(r, g, b);
+
+      const TEAL_D  = [15, 110, 86]   as const;
+      const TEAL_M  = [29, 158, 117]  as const;
+      const TEAL_L  = [225, 245, 238] as const;
+      const TEAL_B  = [159, 225, 203] as const;
+      const TEAL_DP = [8, 80, 65]     as const;
+      const GR4     = [136, 135, 128] as const;
+      const GR6     = [95, 94, 90]    as const;
+      const GR9     = [44, 44, 42]    as const;
+      const GRL     = [180, 178, 169] as const;
+      const SEP     = [232, 232, 228] as const;
+      const PROB_BG = [249, 250, 249] as const;
+      const FT_BG   = [250, 250, 248] as const;
+
+      fill(255, 255, 255); doc.rect(0, 0, pageW, 297, 'F');
+      let y = 0;
+
+      const sep = (full = false) => {
+        draw(...SEP); doc.setLineWidth(0.3);
+        doc.line(full ? 0 : margin, y, full ? pageW : pageW - margin, y);
+        y += 4;
+      };
+      const sLabel = (text: string) => {
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); txt(...TEAL_D);
+        doc.text(text, margin, y); y += 6;
+      };
+      const col1 = margin;
+      const col2 = margin + contentW / 2 + 2;
+      const colW = contentW / 2 - 4;
+      const drawField = (label: string, value: string, x: number, bold = false): number => {
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8); txt(...GR4);
+        doc.text(label, x, y);
+        doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setFontSize(10); txt(...GR9);
+        const lines = doc.splitTextToSize(value || '—', colW);
+        doc.text(lines, x, y + 4.5);
+        return 4.5 + lines.length * 4.5 + 1;
+      };
+      const row2 = (l1: string, v1: string, b1: boolean, l2: string, v2: string, b2 = false) => {
+        const h1 = drawField(l1, v1, col1, b1);
+        const h2 = drawField(l2, v2, col2, b2);
+        y += Math.max(h1, h2) + 3;
+      };
+
+      // ── HEADER ────────────────────────────────────────────────────────────
+      y = 14;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(20); txt(...TEAL_D);
+      doc.text(biz.name, margin, y);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); txt(...GR4);
+      doc.text('TALLER DE REPARACIÓN DE DISPOSITIVOS ELECTRÓNICOS', margin, y + 5.5);
+      txt(...GRL);
+      doc.text([biz.phone, biz.domain].filter(Boolean).join(' · ') || '', margin, y + 10.5);
+
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(20); txt(...TEAL_D);
+      doc.text(repair.ticketNumber, pageW - margin, y, { align: 'right' });
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); txt(...GR4);
+      doc.text(
+        new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' }),
+        pageW - margin, y + 6, { align: 'right' }
+      );
+
+      y = 30;
+      sep(true);
+      y -= 3;
+
+      // Banda "REPORTE DE DIAGNÓSTICO"
+      fill(...TEAL_L); doc.rect(0, y, pageW, 7.5, 'F');
+      draw(...TEAL_B); doc.setLineWidth(0.3);
+      doc.line(0, y + 7.5, pageW, y + 7.5);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); txt(...TEAL_DP);
+      doc.text('REPORTE DE DIAGNÓSTICO', margin, y + 5.2);
+      y += 10;
+
+      // ── SECCIÓN: DISPOSITIVO ──────────────────────────────────────────────
+      y += 3;
+      sLabel('Dispositivo');
+      row2('Tipo', repair.deviceType, true, 'Marca / Modelo', `${repair.deviceBrand} ${repair.deviceModel}`, true);
+      row2(
+        'No. de serie', repair.serialNumber || 'N/A', false,
+        'Cliente', repair.customer.name, false
+      );
+      sep();
+
+      // ── SECCIÓN: PROBLEMA REPORTADO ───────────────────────────────────────
+      sLabel('Problema reportado por el cliente');
+      const issueLines = doc.splitTextToSize(repair.issue, contentW - 10);
+      const calloutH   = issueLines.length * 4.5 + 7;
+      fill(...PROB_BG); doc.rect(margin, y - 2, contentW, calloutH, 'F');
+      fill(...TEAL_M);  doc.rect(margin, y - 2, 2, calloutH, 'F');
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(10); txt(...GR9);
+      doc.text(issueLines, margin + 6, y + 3);
+      y += calloutH + 4;
+      sep();
+
+      // ── SECCIÓN: DIAGNÓSTICO TÉCNICO ──────────────────────────────────────
+      sLabel('Diagnóstico técnico');
+      if (diagNotes.length > 0) {
+        diagNotes.forEach((note: any, i: number) => {
+          // Fecha + autor
+          const noteDate = new Date(note.createdAt).toLocaleString('es-MX', {
+            day: '2-digit', month: 'short', year: 'numeric',
+            hour: '2-digit', minute: '2-digit', timeZone: 'America/Mexico_City',
+          });
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); txt(...GR4);
+          doc.text(`${note.authorName} · ${noteDate}`, margin, y);
+          y += 4.5;
+
+          // Contenido de la nota
+          const noteLines = doc.splitTextToSize(note.content, contentW - 6);
+          const noteH     = noteLines.length * 4.5 + 8;
+          fill(...PROB_BG); doc.rect(margin, y - 2, contentW, noteH, 'F');
+          fill(...TEAL_D);  doc.rect(margin, y - 2, 2, noteH, 'F');
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); txt(...GR9);
+          doc.text(noteLines, margin + 6, y + 3);
+          y += noteH + 3;
+
+          if (i < diagNotes.length - 1) {
+            draw(...SEP); doc.setLineWidth(0.2);
+            doc.line(margin, y, pageW - margin, y);
+            y += 4;
+          }
+        });
+      } else {
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); txt(...GR4);
+        doc.text('Sin notas de diagnóstico registradas.', margin, y);
+        y += 8;
+      }
+      y += 2;
+      sep();
+
+      // ── SECCIÓN: ESTIMADO DE COSTO ────────────────────────────────────────
+      sLabel('Estimado de costo');
+
+      const colDesc = margin;
+      const colImp  = pageW - margin;
+      const descW   = colImp - colDesc - 40;
+
+      // Tabla de conceptos
+      if (repair.diagnosisFee > 0 || serviceParts.length > 0 || inventoryParts.length > 0) {
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); txt(...GR4);
+        doc.text('CONCEPTO', colDesc, y);
+        doc.text('IMPORTE', colImp, y, { align: 'right' });
+        y += 2;
+        draw(...SEP); doc.setLineWidth(0.3); doc.line(margin, y, pageW - margin, y);
+        y += 4;
+
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); txt(...GR9);
+
+        if (repair.diagnosisFee > 0) {
+          doc.text('Diagnóstico / revisión', colDesc, y);
+          doc.setFont('helvetica', 'bold');
+          doc.text(fmt(repair.diagnosisFee), colImp, y, { align: 'right' });
+          doc.setFont('helvetica', 'normal');
+          y += 5.5;
+        }
+        serviceParts.forEach((p: any) => {
+          const name  = p.serviceName ?? 'Mano de obra';
+          const lines = doc.splitTextToSize(name, descW);
+          doc.text(lines, colDesc, y);
+          doc.setFont('helvetica', 'bold');
+          doc.text(fmt(p.unitPrice), colImp, y, { align: 'right' });
+          doc.setFont('helvetica', 'normal');
+          y += lines.length * 4.5 + 1.5;
+        });
+        inventoryParts.forEach((p: any) => {
+          const name  = `${p.quantity}× ${p.item?.name ?? 'Pieza'}`;
+          const lines = doc.splitTextToSize(name, descW);
+          doc.text(lines, colDesc, y);
+          doc.setFont('helvetica', 'bold');
+          doc.text(fmt(p.unitPrice * p.quantity), colImp, y, { align: 'right' });
+          doc.setFont('helvetica', 'normal');
+          y += lines.length * 4.5 + 1.5;
+        });
+
+        draw(...SEP); doc.setLineWidth(0.3); doc.line(margin, y, pageW - margin, y);
+        y += 3;
+      }
+
+      // Total estimado (caja teal)
+      const totalH = 14;
+      fill(...TEAL_L); doc.rect(0, y, pageW, totalH, 'F');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9); txt(...TEAL_DP);
+      doc.text('Total estimado', margin, y + 6);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); txt(...TEAL_M);
+      doc.text('Sujeto a cambios según disponibilidad de piezas', margin, y + 11);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(20); txt(...TEAL_D);
+      doc.text(
+        estimatedTotal > 0 ? fmt(estimatedTotal) : 'Por cotizar',
+        pageW - margin, y + 10.5, { align: 'right' }
+      );
+      y += totalH + 6;
+
+      // ── FOOTER ────────────────────────────────────────────────────────────
+      const footerY = 282;
+      fill(...FT_BG); doc.rect(0, footerY, pageW, 15, 'F');
+      draw(...SEP); doc.setLineWidth(0.3); doc.line(0, footerY, pageW, footerY);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); txt(...TEAL_D);
+      doc.text(repair.ticketNumber, margin, footerY + 8);
+      doc.setFont('helvetica', 'normal'); txt(...GRL);
+      doc.text('Este reporte es informativo — sujeto a aprobación del cliente.', pageW / 2, footerY + 8, { align: 'center' });
+      doc.text(`Generado: ${new Date().toLocaleString('es-MX')}`, pageW - margin, footerY + 8, { align: 'right' });
+
+      window.open(doc.output('bloburl'), '_blank');
+    } catch (err) { console.error(err); alert('Error al generar el reporte.'); }
+    finally { setLoadingDiagnosis(false); }
+  };
+
   return (
     <div className="flex flex-col gap-2">
       <button onClick={generateThermalEntry} disabled={loadingThermalEntry} className="btn-primary w-full justify-center disabled:opacity-50">
@@ -1166,6 +1404,24 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       <button onClick={generateInternalTicket} disabled={loadingInternal} className="btn-secondary w-full justify-center disabled:opacity-50">
         {loadingInternal ? <><Loader2 size={14} className="animate-spin" /> Generando...</> : <><Tag size={14} /> Etiqueta interna + QR</>}
       </button>
+
+      {repair.status === 'DIAGNOSING' && (
+        <>
+          <div className="border-t border-[#1a1a1a] pt-2">
+            <p className="text-[10px] text-[#444] font-mono uppercase tracking-wide mb-2">Diagnóstico</p>
+            <button
+              onClick={generateDiagnosisReport}
+              disabled={loadingDiagnosis}
+              className="btn-secondary w-full justify-center disabled:opacity-50"
+              style={{ borderColor: 'rgb(15 110 86 / 0.3)', color: 'rgb(29 158 117)' }}
+            >
+              {loadingDiagnosis
+                ? <><Loader2 size={14} className="animate-spin" /> Generando...</>
+                : <><Stethoscope size={14} /> Reporte de diagnóstico</>}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
