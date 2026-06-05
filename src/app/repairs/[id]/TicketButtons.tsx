@@ -1274,57 +1274,62 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       // ── SECCIÓN: DIAGNÓSTICO TÉCNICO ──────────────────────────────────────
       sLabel('Diagnóstico técnico');
 
-      // Ancho seguro para texto indentado (margen + 6mm de sangría)
-      const noteTextW = contentW - 14;
+      // Helper: salto de página si queda menos de `needed` mm
+      const ensureSpace = (needed: number) => {
+        if (y + needed > 272) {
+          doc.addPage();
+          fill(255, 255, 255); doc.rect(0, 0, pageW, 297, 'F');
+          y = 16;
+        }
+      };
 
-      // Campo diagnosis de la orden (texto directo del técnico)
-      if (repair.diagnosis && repair.diagnosis.trim()) {
+      // Ancho seguro para texto con sangría
+      const noteTextW = contentW - 10;
+
+      // Bloque limpio de nota: solo línea lateral teal, sin fondo
+      const renderNoteBlock = (content: string) => {
         doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); txt(...GR9);
-        const dLines = doc.splitTextToSize(repair.diagnosis.trim(), noteTextW);
-        const dH     = dLines.length * 5 + 8;
-        fill(...PROB_BG); doc.rect(margin, y - 2, contentW, dH, 'F');
-        fill(...TEAL_D);  doc.rect(margin, y - 2, 2, dH, 'F');
-        doc.text(dLines, margin + 6, y + 3);
-        y += dH + 5;
+        const lines = doc.splitTextToSize(content, noteTextW);
+        const blockH = lines.length * 5 + 4;
+        ensureSpace(blockH + 4);
+        // Línea lateral
+        fill(...TEAL_D); doc.rect(margin, y - 1, 2, blockH, 'F');
+        // Texto
+        doc.text(lines, margin + 6, y + 3);
+        y += blockH + 4;
+      };
+
+      // Campo diagnosis de la orden
+      if (repair.diagnosis && repair.diagnosis.trim()) {
+        renderNoteBlock(repair.diagnosis.trim());
       }
 
-      // Notas del timeline (todas)
+      // Notas del timeline
       if (diagNotes.length > 0) {
         if (repair.diagnosis?.trim()) {
+          ensureSpace(12);
           doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); txt(...GR4);
-          doc.text('NOTAS DEL PROCESO', margin, y); y += 5;
+          doc.text('NOTAS DEL PROCESO', margin, y); y += 6;
         }
         diagNotes.forEach((note: any, i: number) => {
-          // Fecha + autor
           const noteDate = new Date(note.createdAt).toLocaleString('es-MX', {
             day: '2-digit', month: 'short', year: 'numeric',
             hour: '2-digit', minute: '2-digit', timeZone: 'America/Mexico_City',
           });
+          ensureSpace(20);
           doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); txt(...GR4);
-          doc.text(`${note.authorName} · ${noteDate}`, margin, y);
+          doc.text(`${note.authorName} · ${noteDate}`, margin + 6, y);
           y += 4.5;
-
-          // Contenido de la nota
-          doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); txt(...GR9);
-          const noteLines = doc.splitTextToSize(note.content, noteTextW);
-          const noteH     = noteLines.length * 5 + 8;
-          fill(...PROB_BG); doc.rect(margin, y - 2, contentW, noteH, 'F');
-          fill(...TEAL_D);  doc.rect(margin, y - 2, 2, noteH, 'F');
-          doc.text(noteLines, margin + 6, y + 3);
-          y += noteH + 3;
-
-          if (i < diagNotes.length - 1) {
-            draw(...SEP); doc.setLineWidth(0.2);
-            doc.line(margin, y, pageW - margin, y);
-            y += 4;
-          }
+          renderNoteBlock(note.content);
+          if (i < diagNotes.length - 1) { y += 1; }
         });
       } else if (!repair.diagnosis?.trim()) {
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); txt(...GR4);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); txt(...GR4);
         doc.text('Sin diagnóstico registrado todavía.', margin, y);
         y += 8;
       }
       y += 2;
+      ensureSpace(50); // garantiza espacio para el estimado de costo
       sep();
 
       // ── SECCIÓN: ESTIMADO DE COSTO ────────────────────────────────────────
@@ -1389,15 +1394,16 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       );
       y += totalH + 6;
 
-      // ── FOOTER ────────────────────────────────────────────────────────────
-      const footerY = 282;
-      fill(...FT_BG); doc.rect(0, footerY, pageW, 15, 'F');
-      draw(...SEP); doc.setLineWidth(0.3); doc.line(0, footerY, pageW, footerY);
+      // ── FOOTER (en la última página activa) ───────────────────────────────
+      ensureSpace(20);
+      y += 6;
+      draw(...SEP); doc.setLineWidth(0.3); doc.line(0, y, pageW, y);
+      fill(...FT_BG); doc.rect(0, y, pageW, 12, 'F');
       doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); txt(...TEAL_D);
-      doc.text(repair.ticketNumber, margin, footerY + 8);
+      doc.text(repair.ticketNumber, margin, y + 8);
       doc.setFont('helvetica', 'normal'); txt(...GRL);
-      doc.text('Este reporte es informativo — sujeto a aprobación del cliente.', pageW / 2, footerY + 8, { align: 'center' });
-      doc.text(`Generado: ${new Date().toLocaleString('es-MX')}`, pageW - margin, footerY + 8, { align: 'right' });
+      doc.text('Este reporte es informativo — sujeto a aprobación del cliente.', pageW / 2, y + 8, { align: 'center' });
+      doc.text(`Generado: ${new Date().toLocaleString('es-MX')}`, pageW - margin, y + 8, { align: 'right' });
 
       window.open(doc.output('bloburl'), '_blank');
     } catch (err) { console.error(err); alert('Error al generar el reporte.'); }
@@ -1425,22 +1431,20 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
         {loadingInternal ? <><Loader2 size={14} className="animate-spin" /> Generando...</> : <><Tag size={14} /> Etiqueta interna + QR</>}
       </button>
 
-      {repair.status === 'DIAGNOSING' && (
-        <>
-          <div className="border-t border-[#1a1a1a] pt-2">
-            <p className="text-[10px] text-[#444] font-mono uppercase tracking-wide mb-2">Diagnóstico</p>
-            <button
-              onClick={generateDiagnosisReport}
-              disabled={loadingDiagnosis}
-              className="btn-secondary w-full justify-center disabled:opacity-50"
-              style={{ borderColor: 'rgb(15 110 86 / 0.3)', color: 'rgb(29 158 117)' }}
-            >
-              {loadingDiagnosis
-                ? <><Loader2 size={14} className="animate-spin" /> Generando...</>
-                : <><Stethoscope size={14} /> Reporte de diagnóstico</>}
-            </button>
-          </div>
-        </>
+      {repair.status !== 'RECEIVED' && (
+        <div className="border-t border-[#1a1a1a] pt-2">
+          <p className="text-[10px] text-[#444] font-mono uppercase tracking-wide mb-2">Diagnóstico</p>
+          <button
+            onClick={generateDiagnosisReport}
+            disabled={loadingDiagnosis}
+            className="btn-secondary w-full justify-center disabled:opacity-50"
+            style={{ borderColor: 'rgb(15 110 86 / 0.3)', color: 'rgb(29 158 117)' }}
+          >
+            {loadingDiagnosis
+              ? <><Loader2 size={14} className="animate-spin" /> Generando...</>
+              : <><Stethoscope size={14} /> Reporte de diagnóstico</>}
+          </button>
+        </div>
       )}
     </div>
   );
