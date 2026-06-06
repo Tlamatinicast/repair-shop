@@ -1379,8 +1379,8 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
 
       const firstName = repair.customer.name.trim().split(/\s+/)[0];
       const dateStr   = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
-      doc.setProperties({ title: `Diagnostico-${repair.ticketNumber}-${firstName}-${dateStr}` });
-      window.open(doc.output('bloburl'), '_blank');
+      const filename  = `Diagnostico-${repair.ticketNumber}-${firstName}-${dateStr}.pdf`;
+      doc.save(filename);
     } catch (err) { console.error(err); alert('Error al generar el reporte.'); }
     finally { setLoadingDiagnosis(false); }
   };
