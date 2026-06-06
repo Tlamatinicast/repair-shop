@@ -3,7 +3,7 @@
 > Este archivo se carga automáticamente al iniciar Claude Code en este repositorio.
 > Mantenerlo actualizado para que cualquier nueva sesión arranque ya informada.
 >
-> Última actualización: 2026-05-21
+> Última actualización: 2026-06-05
 
 ---
 
@@ -16,9 +16,8 @@
 - **Idioma de trabajo:** Español
 - **OS / Shell:** Windows, usa **CMD** (no PowerShell) para Node/Git
 - **Ruta local (desktop):** `C:\Users\iFrogsMX\Documents\Proyectos Claude\PWA TlamaTech\repair-shop`
-- **Ruta local (laptop):** `C:\Users\iFrogsMX\Documents\repair-shop-local`
 - **GitHub:** https://github.com/Tlamatinicast/repair-shop
-- **Trabaja desde dos máquinas** (desktop + laptop) — el repo en GitHub siempre está actualizado; siempre hacer `git pull` al inicio de cada sesión antes de tocar cualquier archivo.
+- **Trabaja desde desktop únicamente** — siempre hacer `git pull` al inicio de cada sesión antes de tocar cualquier archivo.
 
 ### Estilo de colaboración
 
@@ -137,6 +136,7 @@ src/
 - **Inventario con tipos** — campo `itemType` (PARTS/PRODUCTS/TOOLS). POS filtra `?type=PRODUCTS`. Import/export Excel incluyen columnas Type y Location (retrocompatible, default PARTS)
 - **Control de gastos** — modelos `ExpenseTemplate` + `Expense`. Categorías: RENT/UTILITIES/SALARY/SUPPLIES/TRANSPORT/MARKETING/MAINTENANCE/OTHER. Tipos: FIXED/VARIABLE. 4 métodos de pago. Páginas: `/expenses` (lista mensual + desglose por categoría), `/expenses/new` (con selector de plantilla), `/expenses/templates` (admin). En Sidebar y BottomNav
 - **Módulo de reportes** — `/reports` (admin). Selector: Este mes / Mes anterior / 3 meses / Este año. Tarjetas: Ingresos, Gastos, Utilidad, Margen %. Tendencia 6 meses (barras CSS). Panel de operaciones. Cobros por método. Gastos por categoría. Top dispositivos (todos los tiempos)
+- **Reporte de diagnóstico PDF** — botón en `TicketButtons.tsx`, visible en todos los estados excepto `RECEIVED`. Muestra únicamente el campo `repair.diagnosis` (campo "Diagnóstico técnico" de la orden). NO incluye notas del timeline. Sección de estimado de costo con piezas y mano de obra cotizadas. Multi-página con `ensureSpace()`. Solo línea lateral teal en bloque de texto (sin fondo), para no saturar visualmente.
 
 ---
 
@@ -298,10 +298,7 @@ model Expense {
 ## Comandos útiles
 
 ```cmd
-REM --- Laptop ---
-cd "C:\Users\iFrogsMX\Documents\repair-shop-local"
-
-REM --- Desktop ---
+REM --- Desktop (única máquina de trabajo) ---
 cd "C:\Users\iFrogsMX\Documents\Proyectos Claude\PWA TlamaTech\repair-shop"
 
 REM Actualizar desde GitHub (hacer SIEMPRE al inicio de sesión)

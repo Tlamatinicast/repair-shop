@@ -1151,18 +1151,9 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
   const generateDiagnosisReport = async () => {
     setLoadingDiagnosis(true);
     try {
-      // Fetch notas de diagnóstico y piezas cotizadas en paralelo
-      const [notesRes, partsRes] = await Promise.all([
-        fetch(`/api/repairs/${repair.id}/notes`),
-        fetch(`/api/repairs/${repair.id}/parts`),
-      ]);
-      const allNotes: any[] = notesRes.ok ? await notesRes.json() : [];
+      // Solo necesitamos las piezas cotizadas; el diagnóstico viene del campo repair.diagnosis
+      const partsRes = await fetch(`/api/repairs/${repair.id}/parts`);
       const allParts: any[] = partsRes.ok ? await partsRes.json() : [];
-
-      // Notas excluyendo la de recepción, en orden cronológico
-      const diagNotes = [...allNotes]
-        .filter((n: any) => n.stage !== 'RECEIVED')
-        .reverse();
 
       const inventoryParts = allParts.filter((p: any) => !p.isService);
       const serviceParts   = allParts.filter((p: any) => p.isService);
@@ -1299,31 +1290,10 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
         y += blockH + 4;
       };
 
-      // Campo diagnosis de la orden
+      // Solo muestra el campo "Diagnóstico técnico" de la orden
       if (repair.diagnosis && repair.diagnosis.trim()) {
         renderNoteBlock(repair.diagnosis.trim());
-      }
-
-      // Notas del timeline
-      if (diagNotes.length > 0) {
-        if (repair.diagnosis?.trim()) {
-          ensureSpace(12);
-          doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); txt(...GR4);
-          doc.text('NOTAS DEL PROCESO', margin, y); y += 6;
-        }
-        diagNotes.forEach((note: any, i: number) => {
-          const noteDate = new Date(note.createdAt).toLocaleString('es-MX', {
-            day: '2-digit', month: 'short', year: 'numeric',
-            hour: '2-digit', minute: '2-digit', timeZone: 'America/Mexico_City',
-          });
-          ensureSpace(20);
-          doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); txt(...GR4);
-          doc.text(`${note.authorName} · ${noteDate}`, margin + 6, y);
-          y += 4.5;
-          renderNoteBlock(note.content);
-          if (i < diagNotes.length - 1) { y += 1; }
-        });
-      } else if (!repair.diagnosis?.trim()) {
+      } else {
         doc.setFont('helvetica', 'normal'); doc.setFontSize(9); txt(...GR4);
         doc.text('Sin diagnóstico registrado todavía.', margin, y);
         y += 8;
