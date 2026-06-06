@@ -1281,7 +1281,8 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       const renderNoteBlock = (content: string) => {
         doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); txt(...GR9);
         const lines = doc.splitTextToSize(content, noteTextW);
-        const blockH = lines.length * 5 + 4;
+        // 4mm por línea (jsPDF rinde ~3.85mm a 9.5pt) para no sobreestimar el bloque
+        const blockH = lines.length * 4 + 4;
         ensureSpace(blockH + 4);
         // Línea lateral
         fill(...TEAL_D); doc.rect(margin, y - 1, 2, blockH, 'F');
@@ -1302,10 +1303,9 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       const colImp  = pageW - margin;
       const descW   = colImp - colDesc - 40;
 
-      // 90mm cubre holgadamente: sep(4) + sLabel(6) + tabla ítems(≤30) +
-      // caja total(20) + gap+footer(22). Costo y footer siempre van juntos.
+      // 55mm cubre: sep(4)+sLabel(6)+tabla(≤15)+total(20)+footer(22) sin sobreestimar
       y += 2;
-      ensureSpace(90);
+      ensureSpace(55);
       sep();
 
       // ── SECCIÓN: ESTIMADO DE COSTO ────────────────────────────────────────
