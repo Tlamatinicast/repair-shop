@@ -1298,16 +1298,37 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
         doc.text('Sin diagnóstico registrado todavía.', margin, y);
         y += 8;
       }
+      // ── PRE-CÁLCULO: altura de costo + footer para no separarlos entre páginas ──
+      const colDesc = margin;
+      const colImp  = pageW - margin;
+      const descW   = colImp - colDesc - 40;
+
+      // Calcular mm necesarios para todo el bloque de costo + footer
+      let costSectionH = 4 + 6; // sep + sLabel
+      if (repair.diagnosisFee > 0 || serviceParts.length > 0 || inventoryParts.length > 0) {
+        costSectionH += 6; // encabezado tabla
+        if (repair.diagnosisFee > 0) costSectionH += 5.5;
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
+        serviceParts.forEach((p: any) => {
+          const lines = doc.splitTextToSize(p.serviceName ?? 'Mano de obra', descW);
+          costSectionH += lines.length * 4.5 + 1.5;
+        });
+        inventoryParts.forEach((p: any) => {
+          const lines = doc.splitTextToSize(`${p.quantity}× ${p.item?.name ?? 'Pieza'}`, descW);
+          costSectionH += lines.length * 4.5 + 1.5;
+        });
+        costSectionH += 3; // línea sep antes del total
+      }
+      costSectionH += 14 + 6; // caja total teal
+      costSectionH += 6 + 12 + 4; // gap + caja footer
+
+      // Si costo + footer no caben juntos → nueva página (evita "pedacito" sobrante)
       y += 2;
-      ensureSpace(50); // garantiza espacio para el estimado de costo
+      ensureSpace(costSectionH);
       sep();
 
       // ── SECCIÓN: ESTIMADO DE COSTO ────────────────────────────────────────
       sLabel('Estimado de costo');
-
-      const colDesc = margin;
-      const colImp  = pageW - margin;
-      const descW   = colImp - colDesc - 40;
 
       // Tabla de conceptos
       if (repair.diagnosisFee > 0 || serviceParts.length > 0 || inventoryParts.length > 0) {
@@ -1364,8 +1385,8 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       );
       y += totalH + 6;
 
-      // ── FOOTER (en la última página activa) ───────────────────────────────
-      ensureSpace(20);
+      // ── FOOTER — pegado al total, sin ensureSpace extra ──────────────────
+      // (costo + footer ya se calcularon juntos arriba, nunca se separan)
       y += 6;
       draw(...SEP); doc.setLineWidth(0.3); doc.line(0, y, pageW, y);
       fill(...FT_BG); doc.rect(0, y, pageW, 12, 'F');
