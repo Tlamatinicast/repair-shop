@@ -1377,10 +1377,13 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       doc.text('Este reporte es informativo — sujeto a aprobación del cliente.', pageW / 2, y + 8, { align: 'center' });
       doc.text(`Generado: ${new Date().toLocaleString('es-MX')}`, pageW - margin, y + 8, { align: 'right' });
 
-      const firstName = repair.customer.name.trim().split(/\s+/)[0];
-      const dateStr   = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
-      const filename  = `Diagnostico-${repair.ticketNumber}-${firstName}-${dateStr}.pdf`;
-      doc.save(filename);
+      const firstName  = repair.customer.name.trim().split(/\s+/)[0];
+      const dateStr    = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
+      const filename   = `Diagnostico-${repair.ticketNumber}-${firstName}-${dateStr}.pdf`;
+      const pdfBlob    = doc.output('blob');
+      const namedFile  = new File([pdfBlob], filename, { type: 'application/pdf' });
+      const fileUrl    = URL.createObjectURL(namedFile);
+      window.open(fileUrl, '_blank');
     } catch (err) { console.error(err); alert('Error al generar el reporte.'); }
     finally { setLoadingDiagnosis(false); }
   };
