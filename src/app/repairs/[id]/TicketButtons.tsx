@@ -1383,7 +1383,15 @@ export function TicketButtons({ repair, biz }: { repair: Repair; biz: BizInfo })
       const pdfBlob   = doc.output('blob');
       const namedFile = new File([pdfBlob], filename, { type: 'application/pdf' });
       const fileUrl   = URL.createObjectURL(namedFile);
+      // Abre en pestaña nueva para ver/imprimir
       window.open(fileUrl, '_blank');
+      // Descarga con nombre correcto (independiente de la pestaña)
+      const a = document.createElement('a');
+      a.href = fileUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(fileUrl), 60_000);
     } catch (err) { console.error(err); alert('Error al generar el reporte.'); }
     finally { setLoadingDiagnosis(false); }
