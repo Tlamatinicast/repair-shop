@@ -18,8 +18,9 @@ export default async function InventoryPage({ searchParams }: { searchParams: { 
       ...(category ? { category } : {}),
       ...(q ? {
         OR: [
-          { name: { contains: q } },
-          { sku: { contains: q } },
+          { name:        { contains: q, mode: 'insensitive' } },
+          { sku:         { contains: q, mode: 'insensitive' } },
+          { description: { contains: q, mode: 'insensitive' } },
         ],
       } : {}),
     },
@@ -65,7 +66,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: { 
         )}
 
         <form className="flex flex-col md:flex-row gap-2 mb-5">
-          <input name="q" defaultValue={q} placeholder="Buscar por nombre o SKU..." className="input md:flex-1" />
+          <input name="q" defaultValue={q} placeholder="Buscar por nombre, SKU o descripción..." className="input md:flex-1" />
           <div className="md:w-64">
             <InventoryCategorySelect defaultValue={category} />
           </div>
