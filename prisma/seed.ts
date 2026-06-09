@@ -1,7 +1,18 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
+
+/**
+ * Devuelve la contraseña desde la variable de entorno, o genera una fuerte
+ * aleatoria si no existe. Así NUNCA se hornea un "admin123" en el código.
+ */
+function resolvePassword(envKey: string): { value: string; generated: boolean } {
+  const fromEnv = process.env[envKey];
+  if (fromEnv && fromEnv.length >= 8) return { value: fromEnv, generated: false };
+  return { value: crypto.randomBytes(9).toString('base64url'), generated: true };
+}
 
 async function main() {
   await prisma.repairPart.deleteMany();
@@ -10,15 +21,16 @@ async function main() {
   await prisma.customer.deleteMany();
   await prisma.user.deleteMany();
 
-  // Admin user
-  const adminPassword = await bcrypt.hash('admin123', 12);
-  await prisma.user.create({
-    data: { name: 'Administrador', email: 'admin@taller.com', password: adminPassword, role: 'ADMIN' },
-  });
+  const adminEmail = process.env.SEED_ADMIN_EMAIL || 'admin@taller.com';
+  const techEmail  = process.env.SEED_TECH_EMAIL  || 'tecnico@taller.com';
+  const adminPass  = resolvePassword('SEED_ADMIN_PASSWORD');
+  const techPass   = resolvePassword('SEED_TECH_PASSWORD');
 
-  const techPassword = await bcrypt.hash('tecnico123', 12);
   await prisma.user.create({
-    data: { name: 'Técnico Demo', email: 'tecnico@taller.com', password: techPassword, role: 'TECHNICIAN' },
+    data: { name: 'Administrador', email: adminEmail, password: await bcrypt.hash(adminPass.value, 12), role: 'ADMIN' },
+  });
+  await prisma.user.create({
+    data: { name: 'Técnico Demo', email: techEmail, password: await bcrypt.hash(techPass.value, 12), role: 'TECHNICIAN' },
   });
 
   // Customers
@@ -51,8 +63,14 @@ async function main() {
   ]);
 
   console.log('Seed completado.');
-  console.log('Admin:   admin@taller.com / admin123');
-  console.log('Tecnico: tecnico@taller.com / tecnico123');
+  console.log('───────────────────────────────────────────────');
+  console.log(`Admin:   ${adminEmail} / ${adminPass.value}`);
+  console.log(`Tecnico: ${techEmail} / ${techPass.value}`);
+  if (adminPass.generated || techPass.generated) {
+    console.log('⚠️  Contraseña(s) GENERADA(S) al azar — cópiala AHORA, no se vuelve a mostrar.');
+    console.log('    Para fijarlas tú, define SEED_ADMIN_PASSWORD / SEED_TECH_PASSWORD antes de correr el seed.');
+  }
+  console.log('───────────────────────────────────────────────');
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect());

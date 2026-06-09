@@ -21,7 +21,12 @@ export function LoginForm({ businessName }: { businessName: string }) {
     const password = (form.elements.namedItem('password') as HTMLInputElement).value;
     const result = await signIn('credentials', { email, password, redirect: false });
     if (result?.error) {
-      setError('Correo o contraseña incorrectos.');
+      // El rate-limiter lanza un mensaje que empieza con "Demasiados intentos".
+      setError(
+        result.error.startsWith('Demasiados')
+          ? result.error
+          : 'Correo o contraseña incorrectos.'
+      );
       setLoading(false);
     } else {
       router.push('/');
